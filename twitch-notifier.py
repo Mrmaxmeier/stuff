@@ -1,16 +1,21 @@
 #!/usr/bin/python3
 
 import os
+import sys
 import json
 import requests
 import time
 import sh
 from pprint import pprint
 
-cfg_path = os.path.expanduser("~") + "/.config/twitch-nofifier.json"
+if len(sys.argv) > 1:
+	cfg_path = sys.argv[1]
+else:
+	cfg_path = os.path.expanduser("~") + "/.config/twitch-notifier.json"
 
 
 if not os.path.isfile(cfg_path):
+	print(cfg_path, "missing")
 	username = input("Username> ")
 	auth = input("Auth-Token> ")
 	with open(cfg_path, "w") as f:
@@ -22,12 +27,12 @@ if not os.path.isfile(cfg_path):
 
 
 
-delay = 60
+delay = 90
 blocking = ["i3lock"]
+required = ["i3"]
 
 with open(cfg_path, "r") as f:
 	data = json.load(f)
-
 
 headers = {
 	"Accept": "application/vnd.twitchtv.v3+json",
@@ -52,6 +57,7 @@ while True:
 				"last_processed": time.time()
 			}
 			tobenotified.append(display)
+			print("[+] {} ({}) {}".format(display, game, time.strftime("%Y-%m-%d %H:%M:%S")))
 
 	online_display = [i["channel"]["display_name"] for i in online]
 	tobenotified = [i for i in tobenotified if i in online_display]
@@ -65,9 +71,23 @@ while True:
 			break
 		except sh.ErrorReturnCode_1:
 			pass
+	for pname in required:
+		try:
+			sh.pgrep(pname)
+		except sh.ErrorReturnCode_1:
+			blocked = True
+			print(pname, "required")
+			break
 
 	if not blocked and tobenotified:
-		l = [u[0].upper() + u[1:] for u in tobenotified]
+		if len(tobenotified) > 2:
+			l = [u[0].upper() + u[1:] for u in tobenotified]
+		else:
+			def f(u):
+				for channel in online:
+					if channel["channel"]["display_name"] == u:
+						return "{}{} ({})\n".format(u[0].upper(), u[1:], channel["game"])
+			l = map(f, tobenotified)
 		sh.notify_send("Twitch", " ".join(l))
 		tobenotified = []
 
