@@ -40,15 +40,25 @@ headers = {
 }
 
 tobenotified = []
+notified_start = False
+
+
+print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+
 while True:
-	online = requests.get("https://api.twitch.tv/kraken/streams/followed?limit=100", headers=headers).json()["streams"]
+	try:
+		online = requests.get("https://api.twitch.tv/kraken/streams/followed?limit=100", headers=headers).json()["streams"]
+	except requests.exception.ConnectionError as e:
+		print(e)
+		time.sleep(delay)
+		continue
 	for channel in online:
 		game = channel["game"]
 		username = channel["channel"]["name"]
 		display = channel["channel"]["display_name"]
 		# print(game, username, display)
 		if username in data["data"]:
-			if data["data"][username]["notify"] and data["data"][username]["last_processed"] < time.time() - delay * 2:
+			if data["data"][username]["notify"] and data["data"][username]["last_processed"] < time.time() - delay * 5:
 				tobenotified.append(display)
 			data["data"][username]["last_processed"] = time.time()
 		else:
@@ -90,6 +100,9 @@ while True:
 			l = map(f, tobenotified)
 		sh.notify_send("Twitch", " ".join(l))
 		tobenotified = []
+	if not blocked and not notified_start:
+		sh.notify_send('twitch_notifier started')
+		notified_start = True
 
 	with open(cfg_path, "w") as f:
 		json.dump(data, f)

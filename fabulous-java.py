@@ -2,7 +2,7 @@
 
 import click
 TAB_SIZE = 8
-MAGIC_NUMBER = 180
+MAGIC_NUMBER = 140
 
 RESTYLE_CHARS = "{;}"
 
@@ -46,7 +46,12 @@ def restyle_lines(lines, move_lines=True):
 
 @click.command()
 @click.argument('input', type=click.File('r'))
-def main(input):
+@click.option('--width', default=MAGIC_NUMBER)
+@click.option('--tabsize', default=TAB_SIZE)
+def main(input, width, tabsize):
+	global TAB_SIZE, MAGIC_NUMBER
+	TAB_SIZE = tabsize
+	MAGIC_NUMBER = width
 	print(restyle_lines(input.readlines()))
 
 if __name__ == '__main__':
