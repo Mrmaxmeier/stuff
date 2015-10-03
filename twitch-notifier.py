@@ -98,10 +98,10 @@ while True:
 					if channel["channel"]["display_name"] == u:
 						return "{}{} ({})\n".format(u[0].upper(), u[1:], channel["game"])
 			l = map(f, tobenotified)
-		sh.notify_send("Twitch", " ".join(l))
+		sh.notify_send("Twitch", " ".join(l), urgency="low")
 		tobenotified = []
 	if not blocked and not notified_start:
-		sh.notify_send('twitch_notifier started')
+		sh.notify_send('twitch_notifier started', urgency="low")
 		notified_start = True
 
 	with open(cfg_path, "w") as f:

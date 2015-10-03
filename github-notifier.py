@@ -81,11 +81,12 @@ def notify(d):
 		pprint(d)
 	print(title + " - Private" if private else title)
 	print(message + "\n")
-	sh.notify_send(title, " ".join(l), urgency="normal" if private else "low")
+	sh.notify_send(title, message, urgency="normal" if private else "low")
 
 tobenotified = []
 notified_start = False
 
+print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 while True:
 	headers = {"Accept": "application/vnd.github.v3+json"}
 	if etag:
@@ -131,7 +132,7 @@ while True:
 			notify(elem)
 		tobenotified = []
 	if not blocked and not notified_start:
-		sh.notify_send('twitch_notifier started')
+		sh.notify_send('github_notifier started', urgency="low")
 		notified_start = True
 
 	etag = r.headers["etag"]
