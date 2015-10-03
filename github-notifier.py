@@ -22,6 +22,7 @@ if not os.path.isfile(cfg_path):
 	with open(cfg_path, "w") as f:
 		json.dump({
 			"login": (username, pw),
+			"username": username, 
 			"data": {},
 			"last_event": str(arrow.now())
 		}, f)
@@ -81,18 +82,19 @@ def notify(d):
 		pprint(d)
 	print(title + " - Private" if private else title)
 	print(message + "\n")
-	sh.notify_send(title, " ".join(l), urgency="normal" if private else "low")
+	sh.notify_send(title, message, urgency="normal" if private else "low")
 
 tobenotified = []
 notified_start = False
 
+print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 while True:
 	headers = {"Accept": "application/vnd.github.v3+json"}
 	if etag:
 		headers["If-None-Match"] = etag
 	try:
-		r = requests.get("https://api.github.com/users/Mrmaxmeier/events", headers=headers, auth=auth)
-	except requests.exception.ConnectionError as e:
+		r = requests.get("https://api.github.com/users/" + cfg["username"] + "/events", headers=headers, auth=auth)
+	except requests.exceptions.ConnectionError as e:
 		print(e)
 		time.sleep(60)
 		continue
@@ -127,11 +129,11 @@ while True:
 			break
 
 	if not blocked and tobenotified:
-		for d in tobenotified:
+		for elem in tobenotified:
 			notify(elem)
 		tobenotified = []
 	if not blocked and not notified_start:
-		sh.notify_send('twitch_notifier started')
+		sh.notify_send('github_notifier started', urgency="low")
 		notified_start = True
 
 	etag = r.headers["etag"]
