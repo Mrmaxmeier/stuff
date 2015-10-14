@@ -48,7 +48,7 @@ print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 while True:
 	try:
 		online = requests.get("https://api.twitch.tv/kraken/streams/followed?limit=100", headers=headers).json()["streams"]
-	except requests.exception.ConnectionError as e:
+	except requests.exceptions.ConnectionError as e:
 		print(e)
 		time.sleep(delay)
 		continue

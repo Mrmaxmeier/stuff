@@ -22,6 +22,7 @@ if not os.path.isfile(cfg_path):
 	with open(cfg_path, "w") as f:
 		json.dump({
 			"login": (username, pw),
+			"username": username,
 			"data": {},
 			"last_event": str(arrow.now())
 		}, f)
@@ -41,11 +42,14 @@ auth = requests.auth.HTTPBasicAuth(login[0], login[1]) if login else None
 blocking = ["i3lock"]
 required = ["i3"]
 
-def getName(d):
-	return d["actor"]["login"] # FIXME?
+def actorName(d):
+	return d["actor"]["login"]
+
+def repoName(d):
+	return d["repo"]["name"]
 
 def createDeleteEvent(d):
-	s = "{} {} ".format(getName(d), "created" if d["type"] == "CreateEvent" else "deleted")
+	s = "{} {} ".format(actorName(d), "created" if d["type"] == "CreateEvent" else "deleted")
 	if d["payload"]["ref_type"] == "repository":
 		s += d["repo"]["name"]
 	elif d["payload"]["ref_type"] in ["branch", "tag"]:
@@ -54,18 +58,22 @@ def createDeleteEvent(d):
 		s += d["payload"]["ref_type"]
 	return s
 
-def shortened(msg, length=80):
-	msg = msg.rstrip("\n")
-	if len(msg.split("\n")) < 2 and len(msg) <= 80:
+def shortened(msg, length=55):
+	msg = msg.strip("\n")
+	if len(msg.split("\n")) < 2 and len(msg) <= length:
 		return msg
 	else:
 		return msg.split("\n")[0][:length] + " [...]"
 
 known_types = {
 	"PushEvent": lambda d: "\n".join([c["author"]["name"] + ": " + shortened(c["message"]) for c in d["payload"]["commits"]]) + "\n@" + d["repo"]["name"],
-	"WatchEvent": lambda d: "{} starred {}".format(getName(d), d["repo"]["name"]),
+	"WatchEvent": lambda d: "{} starred {}".format(actorName(d), d["repo"]["name"]),
 	"CreateEvent": createDeleteEvent,
-	"DeleteEvent": createDeleteEvent
+	"DeleteEvent": createDeleteEvent,
+	"IssuesEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["issue"]["title"]), repoName(d)),
+	"IssueCommentEvent": lambda d: "{} commented '{}'\non {}\n@{}".format(actorName(d), shortened(d["payload"]["comment"]["body"]), shortened(d["payload"]["issue"]["title"]), repoName(d)),
+	"PullRequestEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["pull_request"]["title"]), repoName(d)),
+	"ForkEvent": lambda d: "{} forked {}".format(actorName(d), repoName(d))
 }
 
 def tostring(d):
@@ -92,8 +100,8 @@ while True:
 	if etag:
 		headers["If-None-Match"] = etag
 	try:
-		r = requests.get("https://api.github.com/users/Mrmaxmeier/events", headers=headers, auth=auth)
-	except requests.exception.ConnectionError as e:
+		r = requests.get("https://api.github.com/users/" + cfg["username"] + "/received_events", headers=headers, auth=auth)
+	except requests.exceptions.ConnectionError as e:
 		print(e)
 		time.sleep(60)
 		continue
@@ -128,7 +136,7 @@ while True:
 			break
 
 	if not blocked and tobenotified:
-		for d in tobenotified:
+		for elem in tobenotified:
 			notify(elem)
 		tobenotified = []
 	if not blocked and not notified_start:
