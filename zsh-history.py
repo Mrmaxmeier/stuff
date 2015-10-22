@@ -49,29 +49,42 @@ print("\n".join(top[-20:]))
 
 
 def trends(toplen, seconds, pertext):
-	total = {}
-	for key, value in by_base.items():
-		total[key] = len(value) / len(history)
+	def filtered(cond):
+		counter = Counter()
+		filtered_history = [v for v in history if cond(v)]
+		for t, c in filtered_history:
+			c = c.decode("utf-8", "ignore").split(" ")[0]
+			c = c.rstrip("\n").rstrip("&")
+			counter[c] += 1
+		return len(filtered_history), {k: v / len(filtered_history) for k, v in counter.items()}
+
 	now = time.time()
-	filtered = [v for v in history if (now - v[0]) < seconds]
-	filteredCounter = Counter()
-	for t, c in filtered:
-		c = c.decode("utf-8", "ignore").split(" ")[0]
-		c = c.rstrip("\n").rstrip("&")
-		filteredCounter[c] += 1
-	print("\ntop " + str(toplen) + " - trends - " + pertext + " - total: " + str(len(filtered)))
+	past_len, past = filtered(lambda v: (now - v[0]) >= seconds)
+	present_len, present = filtered(lambda v: (now - v[0]) < seconds)
+	print("\ntop {} - trends - {} - total: {} ({:.0%})".format(toplen, pertext, present_len, present_len / len(history)))
 	top = []
-	for key, value in filteredCounter.items():
-		new = value / len(filtered)
-		diff = new - total[key]
-		top.append((diff, "[{}{:.0%}] {}".format("+"*(diff > 0), diff, key)))
-	#print("\n".join([s for d, s in top]))
+	for key in set(list(present.keys()) + list(past.keys())):
+		past_abs = past.get(key, 0) * past_len
+		present_abs = present.get(key, 0) * present_len
+		s = "{} ({} -> {})".format(key, int(past_abs), int(present_abs))
+		if key in past and key in present:
+			diff = present[key] / past[key]
+			if diff > 1:
+				top.append((diff, "[+{:.0%}] {}".format(min(diff - 1, 9.99), s)))
+			else:
+				top.append((1 / diff, "[ -{:.0%}] {}".format(1 - diff, s)))
+		elif key in present:
+			top.append((present[key] * 100, "[ new ] {}".format(s)))
+			#print(top[-1])
+		else:
+			top.append((past[key] * 100, "[ drp ] {}".format(s)))
+			#print(top[-1])
 	top = [s for d, s in sorted(top, key=lambda d: abs(d[0]))]
 	print("\n".join(top[-toplen:]))
 
-trends(toplen=10, seconds=60*60*24*30, pertext="last month")
-trends(toplen=10, seconds=60*60*24*7, pertext="last week")
-trends(toplen=10, seconds=60*60*24, pertext="today")
+trends(toplen=10, seconds=60*60*24*365, pertext="past year")
+trends(toplen=10, seconds=60*60*24*30, pertext="past month")
+trends(toplen=10, seconds=60*60*24*7, pertext="past week")
 
 from fuzzywuzzy import fuzz
 import sh
