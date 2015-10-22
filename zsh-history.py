@@ -72,3 +72,33 @@ def trends(toplen, seconds, pertext):
 trends(toplen=10, seconds=60*60*24*30, pertext="last month")
 trends(toplen=10, seconds=60*60*24*7, pertext="last week")
 trends(toplen=10, seconds=60*60*24, pertext="today")
+
+from fuzzywuzzy import fuzz
+import sh
+
+print("\ntop 10 - common typos")
+all_commands = set()
+for line in sh.zsh("-i", c="alias"):
+	all_commands.add(line.split("=", 1)[0])
+for path in os.getenv("PATH").split(":"):
+	if os.path.isdir(path):
+		all_commands.update(os.listdir(path))
+	else:
+		print("[WARNING] in path but not folder:", path)
+
+top = []
+for key, value in by_base.items():
+	if len(value) < 2 or any([key.startswith(v) for v in ["/", "./", "~/"]]):
+		continue
+	if key not in all_commands:
+		for k2, v2 in by_base.items():
+			if key == k2:
+				continue
+			if fuzz.ratio(key, k2) < 85:
+				continue
+			if k2 in all_commands:
+				top.append((len(value), "{}: {} (-> {})".format(len(value), key, k2)))
+				break
+
+top = [s for d, s in sorted(top, key=lambda d: d[0])]
+print("\n".join(top[-10:]))
