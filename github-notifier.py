@@ -71,9 +71,10 @@ known_types = {
 	"CreateEvent": createDeleteEvent,
 	"DeleteEvent": createDeleteEvent,
 	"IssuesEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["issue"]["title"]), repoName(d)),
-	"IssueCommentEvent": lambda d: "{} commented '{}'\non {}\n@{}".format(actorName(d), shortened(d["payload"]["comment"]["body"]), shortened(d["payload"]["issue"]["title"]), repoName(d)),
+	"IssueCommentEvent": lambda d: "{} commented '{}'\non '{}'\n@{}".format(actorName(d), shortened(d["payload"]["comment"]["body"]), shortened(d["payload"]["issue"]["title"]), repoName(d)),
 	"PullRequestEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["pull_request"]["title"]), repoName(d)),
-	"ForkEvent": lambda d: "{} forked {}".format(actorName(d), repoName(d))
+	"ForkEvent": lambda d: "{} forked {}".format(actorName(d), repoName(d)),
+	"ReleaseEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["release"]["name"]), repoName(d))
 }
 
 def tostring(d):
@@ -123,7 +124,8 @@ while True:
 		try:
 			sh.pgrep(pname)
 			blocked = True
-			print("blocked by", pname)
+			if len(tobenotified) > 0:
+				print("{} notifications blocked by {}".format(len(tobenotified, pname)))
 			break
 		except sh.ErrorReturnCode_1:
 			pass
@@ -144,4 +146,7 @@ while True:
 		notified_start = True
 
 	etag = r.headers["etag"]
-	time.sleep(int(r.headers["x-poll-interval"]))
+	try:
+		time.sleep(int(r.headers["x-poll-interval"]))
+	except KeyboardInterrupt:
+		exit()

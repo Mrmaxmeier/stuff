@@ -66,7 +66,7 @@ def trends(toplen, seconds, pertext):
 	for key in set(list(present.keys()) + list(past.keys())):
 		past_abs = past.get(key, 0) * past_len
 		present_abs = present.get(key, 0) * present_len
-		s = "{} ({} -> {})".format(key, int(past_abs), int(present_abs))
+		s = "{} ({} -> {})".format(key, round(past_abs), round(present_abs))
 		if key in past and key in present:
 			diff = present[key] / past[key]
 			if diff > 1:
