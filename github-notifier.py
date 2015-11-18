@@ -126,7 +126,7 @@ while True:
 			sh.pgrep(pname)
 			blocked = True
 			if len(tobenotified) > 0:
-				print("{} notifications blocked by {}".format(len(tobenotified, pname)))
+				print("{} notifications blocked by {}".format(len(tobenotified), pname))
 			break
 		except sh.ErrorReturnCode_1:
 			pass
