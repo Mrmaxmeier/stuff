@@ -82,13 +82,6 @@ func (a *Ant) flip() {
 	}
 	f := Field{a.position, *initialState.next}
 	active = append(active, f)
-	for i, f := range active {
-		for i2, f2 := range active {
-			if f.pos == f2.pos && i != i2 {
-				panic("dup")
-			}
-		}
-	}
 }
 
 func (a *Ant) tick() {
@@ -129,7 +122,7 @@ func (f *Field) drawHex() {
 	size := 3
 	for dx := -size; dx < size; dx++ {
 		for dy := -size; dy < size; dy++ {
-			if (math.Abs(float64(dx)) + math.Abs(float64(dy))) < float64(size) {
+			if abs(dx)+abs(dy) < size {
 				termbox.SetCell(x+dx, y+dy, c, termbox.ColorDefault, color)
 			}
 		}
