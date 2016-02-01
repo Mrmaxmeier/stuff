@@ -26,7 +26,10 @@ with open(os.path.expanduser("~") + "/.zsh_history", "rb") as f:
 
 print()
 print("total:", len(history))
-dups = len(set([c for t, c in history]))
+dups = 0
+for v, a in Counter([c for t, c in history]).items():
+	if a > 1:
+		dups += a
 print("duplicates: {} ({:.0%})".format(dups, dups / len(history)))
 print("unique: {} ({:.0%})".format(len(history) - dups, (len(history) - dups) / len(history)))
 
