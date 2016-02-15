@@ -21,7 +21,8 @@ type Tester struct {
 	benchmarks  []*Benchmark
 	status1ok   bool
 	outChan     chan string
-	testspassed bool
+	testsPassed bool
+	testsFailed bool
 	cmdFinished bool
 	errors      string
 }
@@ -30,6 +31,22 @@ func (t *Tester) processLines() {
 	var currentTest *Test
 	for line := range t.outChan {
 		line = line[:len(line)-1]
+		//t.errors += fmt.Sprintf("%s\n", line)
+		if line == "PASS" {
+			t.testsPassed = true
+			break
+		} else if line == "FAIL" {
+			t.testsFailed = true
+			break
+		}
+
+		if strings.HasPrefix(line, "=== RUN") {
+			currentTest = &Test{}
+			currentTest.name = line[6+4:]
+			t.tests = append(t.tests, currentTest)
+			continue
+		}
+
 		if currentTest != nil {
 			if strings.HasPrefix(line, "--- PASS") {
 				currentTest.passed = true
@@ -40,26 +57,14 @@ func (t *Tester) processLines() {
 			if strings.HasPrefix(line, "--- FAIL") {
 				currentTest.failed = true
 				t.status1ok = true
-				for line, ok := <-t.outChan; ok && strings.HasPrefix(line, "\t"); line, ok = <-t.outChan {
-					currentTest.err += line[1:len(line)-1] + "\n"
-				}
-				currentTest = nil
-			}
-			if currentTest != nil {
-				currentTest.output += line + "\n"
 				continue
 			}
-		}
-		if strings.HasPrefix(line, "=== RUN") {
-			currentTest = &Test{}
-			currentTest.name = line[6+4:]
-			t.tests = append(t.tests, currentTest)
+			if currentTest.failed {
+				currentTest.err += line + "\n"
+			} else {
+				currentTest.output += line + "\n"
+			}
 			continue
-		}
-
-		if line == "PASS" {
-			t.testspassed = true
-			break
 		}
 
 		t.errors += line + "\n"
@@ -107,8 +112,10 @@ func (t *Tester) render(w io.Writer) {
 	for _, test := range t.tests {
 		test.print(w)
 	}
-	if t.testspassed {
+	if t.testsPassed {
 		fmt.Fprintln(w, color.CyanString("Tests Passed!"))
+	} else if t.testsFailed {
+		fmt.Fprintln(w, color.RedString("Tests Failed!"))
 	}
 	if len(t.benchmarks) > 0 {
 		fmt.Fprintln(w, category("Benchmarks"), len(t.benchmarks))
@@ -136,6 +143,7 @@ func (t *Tester) renderBlocking(wg *sync.WaitGroup) {
 		t.render(writer)
 		writer.Wait()
 	}
+	t.render(writer)
 	writer.Flush()
 	wg.Done()
 }
@@ -185,11 +193,11 @@ func main() {
 	waitGroup.Wait()
 	err := cmd.Wait()
 	tester.cmdFinished = true
+	renderWG.Wait()
 	if err != nil {
 		if err.Error() == "exit status 1" && tester.status1ok {
 			return
 		}
 		panic(err)
 	}
-	renderWG.Wait()
 }
