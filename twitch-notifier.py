@@ -54,6 +54,11 @@ while True:
 			print(res)
 			time.sleep(delay)
 			continue
+	except json.JSONDecodeError as e:
+		print(e)
+		sh.notify_send("Twitch", str(e), urgency="low")
+		time.sleep(delay)
+		continue
 	except requests.exceptions.ConnectionError as e:
 		print(e)
 		time.sleep(delay)
@@ -83,7 +88,8 @@ while True:
 		try:
 			sh.pgrep(pname)
 			blocked = True
-			print("blocked by", pname)
+			if len(tobenotified) > 0:
+				print("{} notifications blocked by {}".format(len(tobenotified), pname))
 			break
 		except sh.ErrorReturnCode_1:
 			pass

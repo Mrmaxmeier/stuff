@@ -11,7 +11,8 @@ TRACKERS = [
 	"udp://tracker.coppersurfer.tk:6969",
 	"udp://tracker.sktorrent.net:6969",
 	"udp://exodus.desync.com:6969",
-	"udp://open.demonii.com:1337"
+	"udp://open.demonii.com:1337",
+	"udp://tracker.ccc.de:80"
 ]
 
 print('connecting...')
