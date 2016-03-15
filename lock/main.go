@@ -10,13 +10,20 @@ import (
 	"github.com/bobziuchkovski/writ"
 )
 
-const sockfile = "/var/run/lock.sock"
+const sockfile = "/tmp/lock.sock"
+
+const (
+	invalidMsg = iota
+	locknow
+	suspendnow
+)
 
 type Config struct {
 	HelpFlag     bool   `flag:"help" description:"Display this help message and exit"`
 	Verbosity    int    `flag:"v, verbose" description:"Display verbose output"`
-	Progress     bool   `flag:"progress" description:"Progress"`
-	Lock         bool   `flag:"lock" description:"Lock"`
+	Progress     bool   `flag:"progress" description:"Display status info line"`
+	Lock         bool   `flag:"lock" description:"Lock now"`
+	Suspend      bool   `flag:"suspend" description:"Suspend now"`
 	LockAfter    string `option:"lock-after" default:"3m"`
 	SuspendAfter string `option:"suspend-after" default:"5m"`
 }
@@ -25,7 +32,7 @@ func main() {
 	config := &Config{}
 	cmd := writ.New("lock", config)
 	cmd.Help.Usage = "Usage: lock [OPTION]..."
-	cmd.Help.Header = "A crappy locker."
+	cmd.Help.Header = "Some crappy locker."
 	_, _, err := cmd.Decode(os.Args[1:])
 	if err != nil || config.HelpFlag {
 		fmt.Println(`
@@ -46,26 +53,39 @@ func main() {
 		cmd.ExitHelp(err)
 	}
 
-	if config.Lock {
-		notify("locking...")
-	} else {
-		getDur := func(s string) time.Duration {
-			time, err := time.ParseDuration(s)
-			if err != nil {
-				panic(err)
-			}
-			return time
+	if config.Lock || config.Suspend {
+		con, err := net.Dial("unix", sockfile)
+		if err != nil {
+			notify(err.Error())
+			return
 		}
-		locker := I3Lock{}
-		locker.Init()
-		idletrigger := XIdleTrigger{
-			lock:    getDur(config.LockAfter),
-			suspend: getDur(config.SuspendAfter),
-			locker:  &locker,
+		if config.Lock {
+			notify("locking remotely...")
+			con.Write([]byte{byte(locknow)})
+		} else {
+			notify("suspending remotely...")
+			con.Write([]byte{byte(suspendnow)})
 		}
-		go listen(&locker)
-		idletrigger.Run(config)
+		con.Close()
+		return
 	}
+
+	getDur := func(s string) time.Duration {
+		time, err := time.ParseDuration(s)
+		if err != nil {
+			panic(err)
+		}
+		return time
+	}
+	locker := I3Lock{}
+	locker.Init()
+	idletrigger := XIdleTrigger{
+		lock:    getDur(config.LockAfter),
+		suspend: getDur(config.SuspendAfter),
+		locker:  &locker,
+	}
+	go listen(&locker)
+	idletrigger.Run(config)
 }
 
 func listen(locker Locker) {
@@ -74,17 +94,35 @@ func listen(locker Locker) {
 		fmt.Println("listen error", err)
 		return
 	}
+	defer l.Close()
 	for {
 		fd, err := l.Accept()
 		if err != nil {
-			fmt.Println("accept error", err)
-			return
+			notify(err.Error())
+			continue
 		}
 
-		go func() {
-			fmt.Println("locking due to unixsock", fd)
-			locker.Lock()
-		}()
+		command := make([]byte, 1)
+		_, err = fd.Read(command)
+		if err != nil {
+			notify(err.Error())
+			continue
+		}
+		switch command[0] {
+		case locknow:
+			go func() {
+				fmt.Println("locking due to unixsock", fd)
+				locker.Lock()
+			}()
+		case suspendnow:
+			go func() {
+				fmt.Println("suspending due to unixsock", fd)
+				suspend()
+			}()
+		case invalidMsg:
+		default:
+			notify("invalid message!")
+		}
 	}
 }
 
@@ -98,4 +136,5 @@ func suspend() {
 	if err != nil {
 		notify(err.Error())
 	}
+	time.Sleep(time.Second * 5) // TODO: magic resume detection
 }

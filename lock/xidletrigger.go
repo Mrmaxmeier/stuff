@@ -90,7 +90,6 @@ func (s *XIdleTrigger) Run(config *Config) {
 			notify("suspending")
 			preExec := time.Now()
 			suspend()
-			time.Sleep(time.Second * 5) // FIXME
 			notify("suspended for " + time.Since(preExec).String())
 			time.Sleep(time.Second)
 		}
