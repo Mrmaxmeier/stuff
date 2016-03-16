@@ -26,11 +26,8 @@ func (s *I3Lock) Init() {
 	s.unlock = make(chan interface{})
 	go func() {
 		for {
-			fmt.Println("waiting for signal")
 			<-s.lock
-			fmt.Println("got signal")
 			s.run()
-			fmt.Println("signaling unlock")
 			signalAll(s.unlock)
 		}
 	}()
@@ -47,14 +44,11 @@ func (s *I3Lock) run() {
 }
 
 func (s *I3Lock) Lock() {
-	fmt.Println("locking...")
 	select {
 	case s.lock <- nil:
 		fmt.Println("locked")
 	case <-time.NewTimer(time.Millisecond * 500).C:
 		notify("locker already active")
 	}
-	fmt.Println("siganld")
 	<-s.unlock
-	fmt.Println("unlockd")
 }

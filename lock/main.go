@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"time"
 
 	"github.com/bobziuchkovski/writ"
@@ -94,35 +95,46 @@ func listen(locker Locker) {
 		fmt.Println("listen error", err)
 		return
 	}
-	defer l.Close()
-	for {
-		fd, err := l.Accept()
-		if err != nil {
-			notify(err.Error())
-			continue
-		}
 
-		command := make([]byte, 1)
-		_, err = fd.Read(command)
-		if err != nil {
-			notify(err.Error())
-			continue
+	go func() {
+		for {
+			fd, err := l.Accept()
+			if err != nil {
+				notify(err.Error())
+				continue
+			}
+			handleClient(fd, locker)
 		}
-		switch command[0] {
-		case locknow:
-			go func() {
-				fmt.Println("locking due to unixsock", fd)
-				locker.Lock()
-			}()
-		case suspendnow:
-			go func() {
-				fmt.Println("suspending due to unixsock", fd)
-				suspend()
-			}()
-		case invalidMsg:
-		default:
-			notify("invalid message!")
-		}
+	}()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
+	l.Close()
+	os.Exit(1)
+}
+
+func handleClient(fd net.Conn, locker Locker) {
+	command := make([]byte, 1)
+	_, err := fd.Read(command)
+	if err != nil {
+		notify(err.Error())
+		return
+	}
+	switch command[0] {
+	case locknow:
+		go func() {
+			fmt.Println("locking due to unixsock", fd)
+			locker.Lock()
+		}()
+	case suspendnow:
+		go func() {
+			fmt.Println("suspending due to unixsock", fd)
+			suspend()
+		}()
+	case invalidMsg:
+	default:
+		notify("invalid message!")
 	}
 }
 
