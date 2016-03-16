@@ -86,12 +86,7 @@ func (s *XIdleTrigger) Run(config *Config) {
 			s.locker.Lock()
 		}
 		if sinceUserInput > s.suspend {
-			s.suspendTime = time.Now()
-			notify("suspending")
-			preExec := time.Now()
-			suspend()
-			notify("suspended for " + time.Since(preExec).String())
-			time.Sleep(time.Second)
+			Suspend()
 		}
 	}
 }

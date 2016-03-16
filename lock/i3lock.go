@@ -16,6 +16,17 @@ func signalAll(c chan interface{}) {
 	}
 }
 
+func blockAndDrain(c chan interface{}) {
+	<-c
+	for {
+		select {
+		case <-c:
+		default:
+			return
+		}
+	}
+}
+
 type I3Lock struct {
 	lock   chan interface{}
 	unlock chan interface{}
@@ -26,7 +37,7 @@ func (s *I3Lock) Init() {
 	s.unlock = make(chan interface{})
 	go func() {
 		for {
-			<-s.lock
+			blockAndDrain(s.lock)
 			s.run()
 			signalAll(s.unlock)
 		}
@@ -50,5 +61,4 @@ func (s *I3Lock) Lock() {
 	case <-time.NewTimer(time.Millisecond * 500).C:
 		notify("locker already active")
 	}
-	<-s.unlock
 }

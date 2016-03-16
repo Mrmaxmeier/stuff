@@ -15,9 +15,12 @@ const sockfile = "/tmp/lock.sock"
 
 const (
 	invalidMsg = iota
-	locknow
-	suspendnow
+	lockMsg
+	suspendMsg
+	quitMsg
 )
+
+var signalChan chan os.Signal
 
 type Config struct {
 	HelpFlag     bool   `flag:"help" description:"Display this help message and exit"`
@@ -62,10 +65,10 @@ func main() {
 		}
 		if config.Lock {
 			notify("locking remotely...")
-			con.Write([]byte{byte(locknow)})
+			con.Write([]byte{byte(lockMsg)})
 		} else {
 			notify("suspending remotely...")
-			con.Write([]byte{byte(suspendnow)})
+			con.Write([]byte{byte(suspendMsg)})
 		}
 		con.Close()
 		return
@@ -91,6 +94,7 @@ func main() {
 
 func listen(locker Locker) {
 	l, err := net.Listen("unix", sockfile)
+	l, err = checkListenErrorCloseOther(l, err)
 	if err != nil {
 		fmt.Println("listen error", err)
 		return
@@ -107,11 +111,35 @@ func listen(locker Locker) {
 		}
 	}()
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	<-c
+	signalChan = make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt)
+	<-signalChan
+	fmt.Println("got interrupt signal")
 	l.Close()
 	os.Exit(1)
+}
+
+func checkListenErrorCloseOther(l net.Listener, err error) (net.Listener, error) {
+	switch err := err.(type) {
+	case *net.OpError:
+		fmt.Println(err.Err)
+		if err.Err.Error() == "bind: address already in use" {
+			fmt.Println("interrupting other daemon remotely...")
+			con, err := net.Dial("unix", sockfile)
+			if err != nil {
+				fmt.Println("failed to quit other daemon")
+				os.Remove(sockfile)
+				return net.Listen("unix", sockfile)
+			}
+			con.Write([]byte{byte(quitMsg)})
+			con.Close()
+			fmt.Println("sent quit message")
+			time.Sleep(time.Millisecond * 250)
+			return net.Listen("unix", sockfile)
+		}
+	default:
+	}
+	return l, err
 }
 
 func handleClient(fd net.Conn, locker Locker) {
@@ -122,16 +150,18 @@ func handleClient(fd net.Conn, locker Locker) {
 		return
 	}
 	switch command[0] {
-	case locknow:
+	case lockMsg:
 		go func() {
 			fmt.Println("locking due to unixsock", fd)
 			locker.Lock()
 		}()
-	case suspendnow:
+	case suspendMsg:
 		go func() {
 			fmt.Println("suspending due to unixsock", fd)
-			suspend()
+			Suspend()
 		}()
+	case quitMsg:
+		signalChan <- os.Interrupt
 	case invalidMsg:
 	default:
 		notify("invalid message!")
@@ -141,12 +171,4 @@ func handleClient(fd net.Conn, locker Locker) {
 func notify(msg string) {
 	fmt.Println(msg)
 	exec.Command("notify-send", msg).Run()
-}
-
-func suspend() {
-	err := exec.Command("systemctl", "suspend").Run()
-	if err != nil {
-		notify(err.Error())
-	}
-	time.Sleep(time.Second * 5) // TODO: magic resume detection
 }
