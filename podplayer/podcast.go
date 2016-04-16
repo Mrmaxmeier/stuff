@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 type Podcast struct {
 	UUID         string    `json:"uuid"`
 	URL          string    `json:"url"`
@@ -14,6 +16,7 @@ type Podcast struct {
 }
 
 func (podcast *Podcast) mergeWith(other Podcast) {
+	fmt.Printf("merging:\n%+v\nwith\n%+v\n", podcast, other)
 	if podcast.UUID != other.UUID {
 		panic("invalid merge")
 	}
@@ -40,14 +43,14 @@ func (podcast *Podcast) mergeWith(other Podcast) {
 }
 
 type Episode struct {
-	UUID           string `json:"uuid"`
-	URL            string `json:"url"`
-	WebsiteURL     string `json:"website_url"`
-	Title          string `json:"title"`
-	Description    string `json:"description"`
-	Dd             string `json:"dd"`
-	DurationInSecs int    `json:"duration_in_secs"`
-	FileType       string `json:"file_type"`
-	PublishedAt    string `json:"published_at"`
-	SizeInBytes    int    `json:"size_in_bytes"`
+	UUID            string `json:"uuid"`
+	URL             string `json:"url"`
+	WebsiteURL      string `json:"website_url"`
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	FullDescription string `json:"dd"`
+	DurationInSecs  int    `json:"duration_in_secs"`
+	FileType        string `json:"file_type"`
+	PublishedAt     string `json:"published_at"`
+	SizeInBytes     int    `json:"size_in_bytes"`
 }

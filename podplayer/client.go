@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -19,21 +21,20 @@ const (
 
 // Client fetches and manages account state.
 type Client struct {
-	token     string
-	email     string
-	password  string
-	device    string
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	Token     string `json:"token"`
+	Device    string `json:"device"`
 	cookieJar http.CookieJar
-	podcasts  map[string]*Podcast
-	episodes  map[string]*Episode
+	Podcasts  map[string]Podcast `json:"podcasts"`
 	mapLock   sync.RWMutex
 }
 
 // Login fetches a token and some cookies.
 func (client *Client) Login() error {
 	req := gorequest.New().Post(urlBase + "security/login")
-	req.Send("email=" + client.email)
-	req.Send("password=" + client.password)
+	req.Send("email=" + client.Email)
+	req.Send("password=" + client.Password)
 	client.cookieJar = req.Client.Jar
 	_, body, errs := req.End()
 	if len(errs) > 0 {
@@ -48,7 +49,7 @@ func (client *Client) Login() error {
 	if reply.Status == statusError {
 		return errors.New(reply.Message)
 	}
-	client.token = reply.Token
+	client.Token = reply.Token
 	reply.Copyright.Check()
 	return nil
 }
@@ -68,7 +69,7 @@ func (client *Client) Sync() error {
 	if reply.Status == statusError {
 		return errors.New(reply.Status)
 	}
-	client.token = reply.Token
+	client.Token = reply.Token
 	reply.Copyright.Check()
 
 	for _, container := range reply.Result.Changes {
@@ -99,14 +100,14 @@ func (client *Client) fetchPodcast(UUID string) error {
 	fmt.Println("fetching podcast", UUID)
 	var podcast Podcast
 	client.mapLock.RLock()
-	if p, ok := client.podcasts[UUID]; ok {
-		podcast = *p
+	if p, ok := client.Podcasts[UUID]; ok {
+		podcast = p
 		client.mapLock.RUnlock()
 	} else {
 		client.mapLock.RUnlock()
 		podcast.UUID = UUID
 		client.mapLock.Lock()
-		client.podcasts[UUID] = &podcast
+		client.Podcasts[UUID] = podcast
 		client.mapLock.Unlock()
 	}
 	data := client.defaultFormData(
@@ -131,6 +132,7 @@ func (client *Client) fetchPodcast(UUID string) error {
 		return errors.New(reply.Message)
 	}
 	podcast.mergeWith(reply.Result.Podcast)
+	client.Podcasts[UUID] = podcast
 	return nil
 }
 
@@ -158,21 +160,21 @@ func (client *Client) defaultFormData(auth, other bool, add ...FormDataPair) (li
 	}
 
 	if auth {
-		set("token", client.token)
-		set("email", client.email)
-		set("password", client.password)
+		set("token", client.Token)
+		set("email", client.Email)
+		set("password", client.Password)
 	}
 
 	if other {
 		now := time.Now()
 		datetime := now.Format("20060102150405")
-		set("device", client.device)
+		set("device", client.Device)
 		set("device_utc_time_ms", fmt.Sprintf("%d", now.UTC().UnixNano()/1e6))
 		set("datetime", datetime)
 		set("v", "1.6")  // api version?
 		set("av", "5.3") // app version
 		set("ac", "310") // app build
-		s := datetime + "1.6" + client.device + SecureUntracableString([]byte{
+		s := datetime + "1.6" + client.Device + SecureUntracableString([]byte{
 			0x5, 0x3c, 0x1f, 0x6d, 0x25, 0x1f, 0x27, 0x37, 0x37, 0x12, 0x1b, 0x50, 0x9, 0x2d,
 			0x6a, 0x1f, 0x1, 0x13, 0x11, 0x51, 0x3d, 0x5f, 0x13, 0x7b, 0x7, 0x3b, 0x55, 0x4d,
 		})
@@ -192,4 +194,31 @@ func (client *Client) defaultFormData(auth, other bool, add ...FormDataPair) (li
 	}
 
 	return list
+}
+
+func (client *Client) SaveToDisk() error {
+	dat, err := json.MarshalIndent(client, "", "\t")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile("data.json", dat, 644)
+}
+
+func LoadClientFromDisk() (client *Client, isNew bool, err error) {
+	client = &Client{Podcasts: make(map[string]Podcast)}
+
+	if _, err = os.Stat("data.json"); os.IsNotExist(err) {
+		return client, true, nil
+	}
+
+	dat, err := ioutil.ReadFile("data.json")
+	if err != nil {
+		return nil, false, err
+	}
+
+	if err := json.Unmarshal(dat, client); err != nil {
+		return nil, false, err
+	}
+
+	return client, false, nil
 }
