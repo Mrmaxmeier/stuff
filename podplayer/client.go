@@ -5,71 +5,67 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/parnurzeal/gorequest"
 )
 
 const urlBase = "https://social.pocketcasts.com/"
 
+const (
+	statusError = "error"
+)
+
 // Client fetches and manages account state.
 type Client struct {
 	token     string
 	email     string
 	password  string
+	device    string
 	cookieJar http.CookieJar
-	podcasts  map[string]Podcast
-	episodes  map[string]Episode
+	podcasts  map[string]*Podcast
+	episodes  map[string]*Episode
+	mapLock   sync.RWMutex
 }
 
 // Login fetches a token and some cookies.
-func (client *Client) Login(email, password string) error {
+func (client *Client) Login() error {
 	req := gorequest.New().Post(urlBase + "security/login")
-	req.Send("email=" + email)
-	req.Send("password=" + password)
+	req.Send("email=" + client.email)
+	req.Send("password=" + client.password)
 	client.cookieJar = req.Client.Jar
-	resp, body, errs := req.End()
-	fmt.Println("errors", errs)
+	_, body, errs := req.End()
 	if len(errs) > 0 {
 		return errs[0]
 	}
-	fmt.Println("header:")
-	fmt.Println(resp.Header)
 	reply := LoginReply{}
-	fmt.Println("body:")
-	fmt.Println(body)
 	err := json.Unmarshal([]byte(body), &reply)
 	if err != nil {
 		return err
 	}
-	fmt.Println(reply)
-	if reply.Status == "error" {
+	fmt.Println(reply.Message)
+	if reply.Status == statusError {
 		return errors.New(reply.Message)
 	}
 	client.token = reply.Token
 	reply.Copyright.Check()
-	client.email = email
-	client.password = password
 	return nil
 }
 
 // Sync fetches all updated podcasts and episodes.
 func (client *Client) Sync() error {
-	data := []FormDataPair{
-		FormDataPair{"data", "{\"records\":[]}"},
-	}
-	resp, body, errs := client.newReg(urlBase+"sync/update", data).End()
-	fmt.Println(resp, body, errs)
+	data := client.defaultFormData(true, false, FormDataPair{"data", "{\"records\":[]}"})
+	_, body, errs := client.newReq(urlBase+"sync/update", data).End()
 	if len(errs) > 0 {
 		return errs[0]
 	}
 	fmt.Println(body)
 	reply := SyncUpdateReply{}
-	err := json.Unmarshal([]byte(body), &reply)
-	if err != nil {
+	if err := json.Unmarshal([]byte(body), &reply); err != nil {
 		return err
 	}
-	fmt.Println(reply)
-	if reply.Status == "error" {
+	if reply.Status == statusError {
 		return errors.New(reply.Status)
 	}
 	client.token = reply.Token
@@ -82,52 +78,70 @@ func (client *Client) Sync() error {
 			if err := json.Unmarshal(container.Change, &userPodcast); err != nil {
 				return err
 			}
-			fmt.Printf("%s\n%+v\n", container.Type, userPodcast)
+			fmt.Printf("%s: %+v\n", container.Type, userPodcast)
+			if err := client.fetchPodcast(userPodcast.UUID); err != nil {
+				return err
+			}
 		case "UserEpisode":
 			var userEpisode UserEpisodeChange
 			if err := json.Unmarshal(container.Change, &userEpisode); err != nil {
 				return err
 			}
-			fmt.Printf("%s\n%+v\n", container.Type, userEpisode)
+			fmt.Printf("%s: %+v\n", container.Type, userEpisode)
 		default:
-			fmt.Println(container.Type)
-			panic("unknown change")
+			panic("unknown change: " + container.Type)
 		}
 	}
-
 	return nil
 }
 
+func (client *Client) fetchPodcast(UUID string) error {
+	fmt.Println("fetching podcast", UUID)
+	var podcast Podcast
+	client.mapLock.RLock()
+	if p, ok := client.podcasts[UUID]; ok {
+		podcast = *p
+		client.mapLock.RUnlock()
+	} else {
+		client.mapLock.RUnlock()
+		podcast.UUID = UUID
+		client.mapLock.Lock()
+		client.podcasts[UUID] = &podcast
+		client.mapLock.Unlock()
+	}
+	data := client.defaultFormData(
+		false, true,
+		FormDataPair{"uuid", UUID},
+		FormDataPair{"episode_count", 3},
+	)
+	request := client.newReq("https://podcasts.shiftyjelly.com.au/podcasts/show", data)
+	delete(request.Header, "Content-Type")
+	resp, body, errs := request.End()
+	fmt.Println(resp, body, errs)
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	fmt.Println("body;", body)
+	reply := PodcastShowReply{}
+	if err := json.Unmarshal([]byte(body), &reply); err != nil {
+		return err
+	}
+	fmt.Printf("%+v\n", reply)
+	if reply.Status == statusError {
+		return errors.New(reply.Message)
+	}
+	podcast.mergeWith(reply.Result.Podcast)
+	return nil
+}
+
+// FormDataPair represents a key-value pair of a post request.
 type FormDataPair struct {
 	key   string
 	value interface{}
 }
 
-func (client *Client) newReg(url string, formData []FormDataPair) *gorequest.SuperAgent {
+func (client *Client) newReq(url string, formData []FormDataPair) *gorequest.SuperAgent {
 	req := gorequest.New().Post(url)
-
-	set := func(key string, val string) {
-		req.Send(fmt.Sprintf("%s=%s", key, val))
-	}
-	set("token", client.token)
-	set("email", client.email)
-	set("password", client.password)
-
-	/*
-		  set("device_utc_time_ms", time.Now().UTC().UnixNano()/1e6)
-			set("last_modified", time.Now().Format("2006-01-02 15:04:05"))
-			set("datetime", time.Now().Format("20060102150405"))
-			set("v", "1.6")
-			set("av", "5.3") // app version
-			set("ac", "310") // app build
-			set("h", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-			set("device", <UUID4>)
-			set("dt", "2")
-			set("c", "US")
-			set("l", "en")
-			set("m", "Device Model")
-			set("sync", "xxxxxxxxxx")
-	*/
 
 	req.Client.Jar = client.cookieJar
 
@@ -136,4 +150,46 @@ func (client *Client) newReg(url string, formData []FormDataPair) *gorequest.Sup
 	}
 
 	return req
+}
+
+func (client *Client) defaultFormData(auth, other bool, add ...FormDataPair) (list []FormDataPair) {
+	set := func(key, val string) {
+		list = append(list, FormDataPair{key, val})
+	}
+
+	if auth {
+		set("token", client.token)
+		set("email", client.email)
+		set("password", client.password)
+	}
+
+	if other {
+		now := time.Now()
+		datetime := now.Format("20060102150405")
+		set("device", client.device)
+		set("device_utc_time_ms", fmt.Sprintf("%d", now.UTC().UnixNano()/1e6))
+		set("datetime", datetime)
+		set("v", "1.6")  // api version?
+		set("av", "5.3") // app version
+		set("ac", "310") // app build
+		s := datetime + "1.6" + client.device + SecureUntracableString([]byte{
+			0x5, 0x3c, 0x1f, 0x6d, 0x25, 0x1f, 0x27, 0x37, 0x37, 0x12, 0x1b, 0x50, 0x9, 0x2d,
+			0x6a, 0x1f, 0x1, 0x13, 0x11, 0x51, 0x3d, 0x5f, 0x13, 0x7b, 0x7, 0x3b, 0x55, 0x4d,
+		})
+		hash := SecureHackProofHash(s)
+		set("h", hash)
+		set("dt", "2")
+		set("c", "US")
+		set("l", "en")
+		set("m", "Watch1,2")
+		set("sync", SecureUntracableString([]byte{0x43, 0x5d, 0x4d, 0x6a, 0x50, 0x59, 0x5a, 0x47, 0x67, 0x46}))
+	}
+
+	// set("last_modified", time.Now().Format("2006-01-02 15:04:05"))
+
+	for _, v := range add {
+		list = append(list, v)
+	}
+
+	return list
 }

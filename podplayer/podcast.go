@@ -13,15 +13,41 @@ type Podcast struct {
 	Episodes     []Episode `json:"episodes"`
 }
 
+func (podcast *Podcast) mergeWith(other Podcast) {
+	if podcast.UUID != other.UUID {
+		panic("invalid merge")
+	}
+	podcast.URL = other.URL
+	podcast.Title = other.Title
+	podcast.ThumbnailURL = other.ThumbnailURL
+	podcast.Category = other.Category
+	podcast.MediaType = other.MediaType
+	podcast.Language = other.Language
+	podcast.Author = other.Author
+
+	episodeMap := make(map[string]Episode)
+	for _, episode := range podcast.Episodes {
+		episodeMap[episode.UUID] = episode
+	}
+	for _, episode := range other.Episodes {
+		episodeMap[episode.UUID] = episode
+	}
+	var episodes []Episode
+	for _, episode := range episodeMap {
+		episodes = append(episodes, episode)
+	}
+	podcast.Episodes = episodes
+}
+
 type Episode struct {
-	UUID           string      `json:"uuid"`
-	URL            string      `json:"url"`
-	WebsiteURL     interface{} `json:"website_url"`
-	Title          string      `json:"title"`
-	Description    string      `json:"description"`
-	Dd             string      `json:"dd"`
-	DurationInSecs int         `json:"duration_in_secs"`
-	FileType       string      `json:"file_type"`
-	PublishedAt    string      `json:"published_at"`
-	SizeInBytes    int         `json:"size_in_bytes"`
+	UUID           string `json:"uuid"`
+	URL            string `json:"url"`
+	WebsiteURL     string `json:"website_url"`
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	Dd             string `json:"dd"`
+	DurationInSecs int    `json:"duration_in_secs"`
+	FileType       string `json:"file_type"`
+	PublishedAt    string `json:"published_at"`
+	SizeInBytes    int    `json:"size_in_bytes"`
 }

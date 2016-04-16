@@ -52,3 +52,11 @@ type SyncUpdateReply struct {
 		LastModified string `json:"last_modified"`
 	} `json:"result"`
 }
+
+type PodcastShowReply struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Result  struct {
+		Podcast Podcast `json:"podcast"`
+	} `json:"result"`
+}
