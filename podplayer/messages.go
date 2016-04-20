@@ -8,7 +8,8 @@ import (
 type PlayingStatus int
 
 const (
-	NotPlayed PlayingStatus = iota
+	Uninitialized PlayingStatus = iota
+	NotPlayed
 	InProgress
 	Finished
 )

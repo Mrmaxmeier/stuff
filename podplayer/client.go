@@ -90,12 +90,23 @@ func (client *Client) Sync() error {
 			if err := client.fetchPodcast(userPodcast.UUID); err != nil {
 				return err
 			}
+			client.mapLock.Lock()
+			pd := client.Podcasts[userPodcast.UUID]
+			pd.TempInfo = userPodcast
+			client.Podcasts[pd.UUID] = pd
+			client.mapLock.Unlock()
 		case "UserEpisode":
 			var userEpisode UserEpisodeChange
 			if err := json.Unmarshal(container.Change, &userEpisode); err != nil {
 				return err
 			}
 			fmt.Printf("%s: %+v\n", container.Type, userEpisode)
+			episode := client.getEpisode(userEpisode.UUID)
+			if episode != nil {
+				episode.TempInfo = userEpisode
+			} else {
+				fmt.Println("episode UUID not found!")
+			}
 		default:
 			panic("unknown change: " + container.Type)
 		}
@@ -120,7 +131,7 @@ func (client *Client) fetchPodcast(UUID string) error {
 	data := client.defaultFormData(
 		false, true,
 		FormDataPair{"uuid", UUID},
-		FormDataPair{"episode_count", 3},
+		FormDataPair{"episode_count", 10},
 	)
 	request := client.newReq("https://podcasts.shiftyjelly.com.au/podcasts/show", data)
 	delete(request.Header, "Content-Type")
@@ -140,6 +151,19 @@ func (client *Client) fetchPodcast(UUID string) error {
 	}
 	podcast.mergeWith(reply.Result.Podcast)
 	client.Podcasts[UUID] = podcast
+	return nil
+}
+
+func (client *Client) getEpisode(UUID string) *Episode {
+	client.mapLock.RLock()
+	defer client.mapLock.RUnlock()
+	for _, pd := range client.Podcasts {
+		for _, ep := range pd.Episodes {
+			if ep.UUID == UUID {
+				return &ep
+			}
+		}
+	}
 	return nil
 }
 

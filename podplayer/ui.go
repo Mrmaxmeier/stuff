@@ -28,6 +28,11 @@ func pickEpisode(podcasts []Podcast) *Episode {
 	keyEvents := make(chan tcell.EventKey)
 	go func() {
 		for {
+			select {
+			case <-quit:
+				return
+			default:
+			}
 			ev := s.PollEvent()
 			switch ev := ev.(type) {
 			case *tcell.EventKey:
@@ -77,9 +82,12 @@ func pickEpisode(podcasts []Podcast) *Episode {
 					ep.ActiveIndex++
 				}
 			case tcell.KeyEnter:
-				episode := ep.Episode()
-				s.Fini()
-				return &episode
+				if ep.Active {
+					episode := ep.Episode()
+					s.Fini()
+					close(quit)
+					return &episode
+				}
 			case tcell.KeyLeft:
 				pp.Active = true
 				ep.Active = false

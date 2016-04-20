@@ -13,6 +13,8 @@ type Podcast struct {
 	Language     string    `json:"language"`
 	Author       string    `json:"author"`
 	Episodes     []Episode `json:"episodes"`
+
+	TempInfo UserPodcastChange `json:"temporary_info"`
 }
 
 func (podcast *Podcast) mergeWith(other Podcast) {
@@ -27,6 +29,7 @@ func (podcast *Podcast) mergeWith(other Podcast) {
 	podcast.MediaType = other.MediaType
 	podcast.Language = other.Language
 	podcast.Author = other.Author
+	podcast.TempInfo = other.TempInfo
 
 	episodeMap := make(map[string]Episode)
 	for _, episode := range podcast.Episodes {
@@ -53,4 +56,6 @@ type Episode struct {
 	FileType        string `json:"file_type"`
 	PublishedAt     string `json:"published_at"`
 	SizeInBytes     int    `json:"size_in_bytes"`
+
+	TempInfo UserEpisodeChange `json:"temporary_info"`
 }

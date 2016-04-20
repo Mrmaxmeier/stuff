@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -19,10 +20,13 @@ type MPV struct {
 	socketPath string
 	sendChan   chan interface{}
 	doneCh     chan interface{}
+	eventChan  map[string]chan interface{}
+	ipcDone    sync.WaitGroup
 }
 
 // Launch starts mpv given an url to play.
 func (mpv *MPV) Launch(media string) {
+	fmt.Println("streaming", media)
 	mpv.doneCh = make(chan interface{})
 	mpv.media = media
 	suffix := int(time.Now().UnixNano()) + os.Getpid()
@@ -30,15 +34,12 @@ func (mpv *MPV) Launch(media string) {
 	fmt.Println("socketPath:", mpv.socketPath)
 	mpv.launchProcess()
 	fmt.Println("launched process")
-	var ipcDone sync.WaitGroup
-	mpv.connectToIPC(&ipcDone)
+	mpv.connectToIPC()
+}
 
-	fmt.Println("waiting 5s")
-	time.Sleep(time.Second * 5)
-	//mpv.observeValues()
-	fmt.Println("waiting on ipc sync.WaitGroup")
-	ipcDone.Wait()
-	fmt.Println("done")
+// Wait waits for the mpv process to exit.
+func (mpv *MPV) Wait() {
+	mpv.ipcDone.Wait()
 }
 
 func (mpv *MPV) launchProcess() {
@@ -60,7 +61,7 @@ func (mpv *MPV) launchProcess() {
 	}()
 }
 
-func (mpv *MPV) connectToIPC(wg *sync.WaitGroup) {
+func (mpv *MPV) connectToIPC() {
 	for {
 		time.Sleep(time.Millisecond * 150)
 		fmt.Println("stat", mpv.socketPath)
@@ -75,7 +76,7 @@ func (mpv *MPV) connectToIPC(wg *sync.WaitGroup) {
 		panic(err)
 	}
 
-	wg.Add(2)
+	mpv.ipcDone.Add(2)
 
 	go func() {
 		data := make([]byte, 1024)
@@ -85,16 +86,15 @@ func (mpv *MPV) connectToIPC(wg *sync.WaitGroup) {
 			fmt.Println("read", n, "bytes")
 			if err == io.EOF || n == 0 {
 				break
-			}
-			fmt.Println(string(data[:n-1]))
-			if err != nil {
+			} else if err != nil {
 				panic(err)
 			}
+			for _, seperated := range strings.Split(string(data[:n-1]), "\n") {
+				mpv.parseMessage(seperated)
+			}
 		}
-		wg.Done()
-		fmt.Println("readRoutine waiting for sendRoutine")
-		wg.Wait()
-		fmt.Println("readRoutine closing and exiting")
+		mpv.ipcDone.Done()
+		mpv.ipcDone.Wait()
 		_ = conn.Close()
 	}()
 
@@ -106,8 +106,7 @@ func (mpv *MPV) connectToIPC(wg *sync.WaitGroup) {
 			select {
 			case data = <-mpv.sendChan:
 			case <-mpv.doneCh:
-				fmt.Println("sendRoutine got doneCh signal")
-				wg.Done()
+				mpv.ipcDone.Done()
 				return
 			}
 			buf, err := json.Marshal(data)
@@ -125,11 +124,55 @@ func (mpv *MPV) connectToIPC(wg *sync.WaitGroup) {
 	}()
 }
 
+func (mpv *MPV) parseMessage(str string) {
+	fmt.Println("parse", str)
+	var typ struct {
+		Event string `json:"event"`
+	}
+	if err := json.Unmarshal([]byte(str), &typ); err != nil {
+		panic(err)
+	}
+	fmt.Println(typ.Event)
+}
+
 func (mpv *MPV) observeValues() {
 	fmt.Println("observing values")
 	mpv.sendChan <- struct {
 		Command []interface{} `json:"command"`
 	}{
 		[]interface{}{"observe_property", 1, "playback-time"},
+	}
+}
+
+func (mpv *MPV) subscribeEvent(typ string) chan interface{} {
+	evChan := make(chan interface{})
+	mpv.eventChan[typ] = evChan
+	return evChan
+}
+
+// Seek seeks to given absolute position.
+func (mpv *MPV) Seek(seconds uint) {
+	mpv.sendChan <- struct {
+		Command []interface{} `json:"command"`
+	}{
+		[]interface{}{"seek", seconds, "absolute"},
+	}
+}
+
+func (mpv *MPV) ReportPlayingStatus(cb func(playing bool, position float64)) {
+	var position float64
+	pauseChan := mpv.subscribeEvent("pause")
+	unpauseChan := mpv.subscribeEvent("unpause")
+	select {
+	case <-pauseChan:
+		cb(false, position)
+	case <-unpauseChan:
+		cb(true, position)
+	case <-time.After(time.Second * 5):
+		mpv.sendChan <- struct {
+			Command []interface{} `json:"command"`
+		}{
+			[]interface{}{"seek", seconds, "absolute"},
+		}
 	}
 }
