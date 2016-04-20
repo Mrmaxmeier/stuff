@@ -14,20 +14,24 @@ import (
 	"time"
 )
 
+const (
+	reqTime int = iota + 1
+)
+
 // MPV launches and controls mpv sessions.
 type MPV struct {
 	media      string
 	socketPath string
 	sendChan   chan interface{}
 	doneCh     chan interface{}
-	eventChan  map[string]chan interface{}
+	eventChan  map[string]chan []byte
+	reqChan    map[int]chan []byte
 	ipcDone    sync.WaitGroup
 }
 
 // Launch starts mpv given an url to play.
 func (mpv *MPV) Launch(media string) {
 	fmt.Println("streaming", media)
-	mpv.doneCh = make(chan interface{})
 	mpv.media = media
 	suffix := int(time.Now().UnixNano()) + os.Getpid()
 	mpv.socketPath = filepath.Join("/tmp", strconv.Itoa(suffix))
@@ -125,29 +129,45 @@ func (mpv *MPV) connectToIPC() {
 }
 
 func (mpv *MPV) parseMessage(str string) {
+	byt := []byte(str)
 	fmt.Println("parse", str)
 	var typ struct {
-		Event string `json:"event"`
+		Event     string `json:"event"`
+		RequestID int    `json:"request_id"`
 	}
-	if err := json.Unmarshal([]byte(str), &typ); err != nil {
+	if err := json.Unmarshal(byt, &typ); err != nil {
 		panic(err)
 	}
-	fmt.Println(typ.Event)
-}
-
-func (mpv *MPV) observeValues() {
-	fmt.Println("observing values")
-	mpv.sendChan <- struct {
-		Command []interface{} `json:"command"`
-	}{
-		[]interface{}{"observe_property", 1, "playback-time"},
+	if typ.Event != "" {
+		fmt.Println("event", typ.Event)
+		select {
+		case mpv.eventChan[typ.Event] <- byt:
+		default:
+			fmt.Println("event chan full")
+		}
+	} else if typ.RequestID > 0 {
+		fmt.Println("reqid", typ.RequestID)
+		select {
+		case mpv.reqChan[typ.RequestID] <- byt:
+		default:
+			fmt.Println("req chan full")
+		}
+	} else {
+		fmt.Println(str)
+		panic("invalid message")
 	}
 }
 
-func (mpv *MPV) subscribeEvent(typ string) chan interface{} {
-	evChan := make(chan interface{})
+func (mpv *MPV) subscribeEvent(typ string) chan []byte {
+	evChan := make(chan []byte, 5)
 	mpv.eventChan[typ] = evChan
 	return evChan
+}
+
+func (mpv *MPV) subscribeData(typ int) chan []byte {
+	c := make(chan []byte, 5)
+	mpv.reqChan[typ] = c
+	return c
 }
 
 // Seek seeks to given absolute position.
@@ -161,18 +181,45 @@ func (mpv *MPV) Seek(seconds uint) {
 
 func (mpv *MPV) ReportPlayingStatus(cb func(playing bool, position float64)) {
 	var position float64
+	var playing = true
 	pauseChan := mpv.subscribeEvent("pause")
 	unpauseChan := mpv.subscribeEvent("unpause")
-	select {
-	case <-pauseChan:
-		cb(false, position)
-	case <-unpauseChan:
-		cb(true, position)
-	case <-time.After(time.Second * 5):
-		mpv.sendChan <- struct {
-			Command []interface{} `json:"command"`
-		}{
-			[]interface{}{"seek", seconds, "absolute"},
+	playbackTimeChan := mpv.subscribeData(reqTime)
+
+	for {
+		select {
+		case <-pauseChan:
+			playing = false
+			cb(false, position)
+		case <-unpauseChan:
+			playing = true
+		case dat := <-playbackTimeChan:
+			var d struct {
+				Seconds float64 `json:"data"`
+				Error   string  `json:"error"`
+			}
+			if err := json.Unmarshal(dat, &d); err != nil {
+				panic(err)
+			}
+			position = d.Seconds
+		case <-time.After(time.Second * 5):
+			mpv.sendChan <- struct {
+				Command   []interface{} `json:"command"`
+				RequestID int           `json:"request_id"`
+			}{
+				[]interface{}{"get_property", "playback-time"},
+				reqTime,
+			}
 		}
+		cb(playing, position)
+	}
+}
+
+func NewMPV() MPV {
+	return MPV{
+		sendChan:  make(chan interface{}),
+		doneCh:    make(chan interface{}),
+		eventChan: make(map[string]chan []byte),
+		reqChan:   make(map[int]chan []byte),
 	}
 }

@@ -57,7 +57,7 @@ func main() {
 	}
 
 	fmt.Printf("%+v\n", episode)
-	mpv := MPV{}
+	mpv := NewMPV()
 	mpv.Launch(episode.URL)
 
 	if episode.TempInfo.PlayingStatus == InProgress {
