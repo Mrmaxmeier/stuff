@@ -40,4 +40,14 @@ func main() {
 		panic(e)
 	}
 	client.SaveToDisk()
+	podList := make([]Podcast, 0, len(client.Podcasts))
+
+	for _, podcast := range client.Podcasts {
+		podList = append(podList, podcast)
+	}
+
+	episode := pickEpisode(podList)
+	fmt.Printf("%+v\n", episode)
+	mpv := MPV{}
+	mpv.Launch(episode.URL)
 }

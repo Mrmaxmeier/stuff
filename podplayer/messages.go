@@ -5,6 +5,14 @@ import (
 	"fmt"
 )
 
+type PlayingStatus int
+
+const (
+	NotPlayed PlayingStatus = iota
+	InProgress
+	Finished
+)
+
 type Copyright string
 
 // Check checks if the copyright string matches
@@ -24,12 +32,12 @@ type LoginReply struct {
 }
 
 type UserEpisodeChange struct {
-	UUID          string `json:"uuid"`
-	PlayingStatus int    `json:"playing_status"`
-	PlayedUpTo    int    `json:"played_up_to"`
-	IsDeleted     bool   `json:"is_deleted"`
-	Duration      int    `json:"duration"`
-	Starred       bool   `json:"starred"`
+	UUID          string        `json:"uuid"`
+	PlayingStatus PlayingStatus `json:"playing_status"`
+	PlayedUpTo    int           `json:"played_up_to"`
+	IsDeleted     bool          `json:"is_deleted"`
+	Duration      int           `json:"duration"`
+	Starred       bool          `json:"starred"`
 }
 
 type UserPodcastChange struct {

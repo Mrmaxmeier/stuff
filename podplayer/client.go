@@ -21,12 +21,14 @@ const (
 
 // Client fetches and manages account state.
 type Client struct {
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-	Token     string `json:"token"`
-	Device    string `json:"device"`
+	Email        string             `json:"email"`
+	Password     string             `json:"password"`
+	Token        string             `json:"token"`
+	Device       string             `json:"device"`
+	Podcasts     map[string]Podcast `json:"podcasts"`
+	LastModified time.Time          `json:"last-modified"`
+
 	cookieJar http.CookieJar
-	Podcasts  map[string]Podcast `json:"podcasts"`
 	mapLock   sync.RWMutex
 }
 
@@ -70,6 +72,11 @@ func (client *Client) Sync() error {
 		return errors.New(reply.Status)
 	}
 	client.Token = reply.Token
+	lastModified, err := time.Parse("2006-01-02 15:04:05", reply.Result.LastModified)
+	if err != nil {
+		return err
+	}
+	client.LastModified = lastModified
 	reply.Copyright.Check()
 
 	for _, container := range reply.Result.Changes {
@@ -187,7 +194,9 @@ func (client *Client) defaultFormData(auth, other bool, add ...FormDataPair) (li
 		set("sync", SecureUntracableString([]byte{0x43, 0x5d, 0x4d, 0x6a, 0x50, 0x59, 0x5a, 0x47, 0x67, 0x46}))
 	}
 
-	// set("last_modified", time.Now().Format("2006-01-02 15:04:05"))
+	if !client.LastModified.Equal(time.Time{}) {
+		set("last_modified", client.LastModified.Format("2006-01-02 15:04:05"))
+	}
 
 	for _, v := range add {
 		list = append(list, v)
@@ -196,6 +205,7 @@ func (client *Client) defaultFormData(auth, other bool, add ...FormDataPair) (li
 	return list
 }
 
+// SaveToDisk saves profile to disk.
 func (client *Client) SaveToDisk() error {
 	dat, err := json.MarshalIndent(client, "", "\t")
 	if err != nil {
@@ -204,6 +214,7 @@ func (client *Client) SaveToDisk() error {
 	return ioutil.WriteFile("data.json", dat, 644)
 }
 
+// LoadClientFromDisk loads client profile from disk.
 func LoadClientFromDisk() (client *Client, isNew bool, err error) {
 	client = &Client{Podcasts: make(map[string]Podcast)}
 

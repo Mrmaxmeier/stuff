@@ -1,3 +1,6 @@
 # go binaries
 langtons-ant
 lock/lock
+podplayer/data.json
+podplayer/podplayer
+podplayer/podplayer.exe
