@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -151,6 +152,7 @@ func (client *Client) fetchPodcast(UUID string) error {
 	}
 	podcast.mergeWith(reply.Result.Podcast)
 	client.Podcasts[UUID] = podcast
+	client.UpdateState()
 	return nil
 }
 
@@ -203,8 +205,8 @@ func (client *Client) defaultFormData(auth, other bool, add ...FormDataPair) (li
 		set("device_utc_time_ms", fmt.Sprintf("%d", now.UTC().UnixNano()/1e6))
 		set("datetime", datetime)
 		set("v", "1.6")  // api version?
-		set("av", "5.3") // app version
-		set("ac", "310") // app build
+		set("av", "5.4") // app version
+		set("ac", "319") // app build
 		s := datetime + "1.6" + client.Device + SecureUntracableString([]byte{
 			0x5, 0x3c, 0x1f, 0x6d, 0x25, 0x1f, 0x27, 0x37, 0x37, 0x12, 0x1b, 0x50, 0x9, 0x2d,
 			0x6a, 0x1f, 0x1, 0x13, 0x11, 0x51, 0x3d, 0x5f, 0x13, 0x7b, 0x7, 0x3b, 0x55, 0x4d,
@@ -227,6 +229,74 @@ func (client *Client) defaultFormData(auth, other bool, add ...FormDataPair) (li
 	}
 
 	return list
+}
+
+func (client *Client) SendSyncUpdate(syncupdates ...SyncUpdateMessage) error {
+	sum := SyncUpdateMessages{
+		syncupdates,
+	}
+	dat, err := json.Marshal(sum)
+	if err != nil {
+		return err
+	}
+
+	data := client.defaultFormData(
+		true, true,
+		FormDataPair{"data", string(dat)},
+	)
+
+	request := client.newReq(urlBase+"sync/update", data)
+	resp, body, errs := request.End()
+	fmt.Println(resp, body, errs)
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
+}
+
+func (client *Client) ReportPlayingStatus(episode *Episode, playingStatus chan float64, quit chan interface{}) {
+	ticker := time.NewTicker(time.Minute)
+	var status float64
+	var isNew bool
+	for {
+		select {
+		case <-quit:
+			ticker.Stop()
+			return
+		case new := <-playingStatus:
+			if status != new {
+				isNew = true
+				status = new
+			}
+		case now := <-ticker.C:
+			if isNew {
+				isNew = false
+				fmt.Println("reporting swag", status)
+				playingStatusModified := now // FIXME!
+				epcu := EpisodeChangeUpdate{
+					UUID:                  episode.UUID,
+					PlayingStatus:         InProgress,
+					PlayingStatusModified: playingStatusModified.UnixNano() / 1e6,
+					PlayedUpTo:            status,
+					PlayedUpToModified:    now.UnixNano() / 1e6,
+					UserPodcastUUID:       episode.podcast.UUID,
+				}
+				if err := client.SendSyncUpdate(SyncUpdateMessage{epcu, "EpisodeChange"}); err != nil {
+					panic(err)
+				}
+			}
+		}
+	}
+}
+
+// UpdateState ensures consistency in state.
+func (client *Client) UpdateState() {
+	for _, podcast := range client.Podcasts {
+		sort.Sort(Episodes(podcast.Episodes))
+		for i := 0; i < len(podcast.Episodes); i++ {
+			podcast.Episodes[i].podcast = podcast
+		}
+	}
 }
 
 // SaveToDisk saves profile to disk.
@@ -254,6 +324,8 @@ func LoadClientFromDisk() (client *Client, isNew bool, err error) {
 	if err := json.Unmarshal(dat, client); err != nil {
 		return nil, false, err
 	}
+
+	client.UpdateState()
 
 	return client, false, nil
 }

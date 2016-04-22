@@ -56,7 +56,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("%+v\n", episode)
+	fmt.Println(episode.Title)
 	mpv := NewMPV()
 	mpv.Launch(episode.URL)
 
@@ -65,8 +65,15 @@ func main() {
 		mpv.Seek(uint(episode.TempInfo.PlayedUpTo))
 	}
 
+	playingStatus := make(chan float64)
+	quitChan := make(chan interface{})
+
+	go client.ReportPlayingStatus(episode, playingStatus, quitChan)
+
 	go mpv.ReportPlayingStatus(func(playing bool, position float64) {
 		fmt.Println("statusCB", playing, position)
+		playingStatus <- position
 	})
 	mpv.Wait()
+	close(quitChan)
 }

@@ -1,6 +1,13 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
+
+func parseDate(s string) (time.Time, error) {
+	return time.Parse("2006-01-02 15:04:05", s)
+}
 
 type Podcast struct {
 	UUID         string    `json:"uuid"`
@@ -58,4 +65,20 @@ type Episode struct {
 	SizeInBytes     int    `json:"size_in_bytes"`
 
 	TempInfo UserEpisodeChange `json:"temporary_info"`
+
+	podcast Podcast
+}
+
+type Episodes []Episode
+
+func (s Episodes) Len() int {
+	return len(s)
+}
+func (s Episodes) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s Episodes) Less(i, j int) bool {
+	ti, _ := parseDate(s[i].PublishedAt)
+	tj, _ := parseDate(s[j].PublishedAt)
+	return ti.After(tj)
 }

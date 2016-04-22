@@ -35,9 +35,16 @@ func (lp *EpisodePicker) Render(screen tcell.Screen) {
 		if active {
 			screen.SetCell(x, y, getStyle(true), '>')
 		} else {
-			screen.SetCell(x, y, getStyle(false), ' ')
+			char := ' '
+			switch episode.TempInfo.PlayingStatus {
+			case InProgress:
+				char = '.'
+			case Finished:
+				char = '-'
+			}
+			screen.SetCell(x, y, getStyle(false), char)
 		}
-		setString(screen, x+1, y, episode.Description, getStyle(active))
+		setString(screen, x+1, y, episode.Title, getStyle(active))
 	}
 }
 

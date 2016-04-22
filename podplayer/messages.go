@@ -69,3 +69,21 @@ type PodcastShowReply struct {
 		Podcast Podcast `json:"podcast"`
 	} `json:"result"`
 }
+
+type EpisodeChangeUpdate struct {
+	UUID                  string        `json:"uuid"`
+	PlayingStatus         PlayingStatus `json:"playing_status"`
+	PlayingStatusModified int64         `json:"playing_status_modified"`
+	PlayedUpTo            float64       `json:"played_up_to"`
+	PlayedUpToModified    int64         `json:"played_up_to_modified"`
+	UserPodcastUUID       string        `json:"user_podcast_uuid"`
+}
+
+type SyncUpdateMessage struct {
+	Fields interface{} `json:"fields"`
+	Type   string      `json:"type"`
+}
+
+type SyncUpdateMessages struct {
+	Records []SyncUpdateMessage `json:"records"`
+}
