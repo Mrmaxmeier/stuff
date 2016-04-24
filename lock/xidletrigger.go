@@ -15,8 +15,6 @@ type XIdleTrigger struct {
 	locker      Locker
 	lock        time.Duration
 	suspend     time.Duration
-	lockTime    time.Time
-	suspendTime time.Time
 	latestEvent time.Time
 	rootWindow  xproto.Drawable
 	X           *xgb.Conn
@@ -82,7 +80,6 @@ func (s *XIdleTrigger) Run(config *Config) {
 			panic(err)
 		}
 		if sinceUserInput > s.lock {
-			s.lockTime = time.Now()
 			s.locker.Lock()
 		}
 		if sinceUserInput > s.suspend {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os/exec"
 	"time"
 )
@@ -57,8 +56,6 @@ func (s *I3Lock) run() {
 func (s *I3Lock) Lock() {
 	select {
 	case s.lock <- nil:
-		fmt.Println("locked")
-	case <-time.NewTimer(time.Millisecond * 500).C:
-		notify("locker already active")
+	case <-time.NewTimer(time.Millisecond * 125).C:
 	}
 }

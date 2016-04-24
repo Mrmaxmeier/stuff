@@ -89,6 +89,7 @@ func main() {
 		locker:  &locker,
 	}
 	go listen(&locker)
+	go suspendRoutine()
 	idletrigger.Run(config)
 }
 
