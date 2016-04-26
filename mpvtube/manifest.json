@@ -1,0 +1,18 @@
+{
+	"manifest_version": 2,
+	"name": "MPVTube",
+	"description": "pops out video-links to mpv",
+	"version": "1.0",
+	"browser_action": {
+		"default_icon": "mpv-icon.png",
+		"default_popup": "popup.html"
+	},
+	"permissions": [
+		"contextMenus",
+		"webRequest",
+		"*://localhost/"
+	],
+	"background": {
+		"scripts": ["script.js"]
+	}
+}
