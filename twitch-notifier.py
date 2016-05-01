@@ -18,6 +18,18 @@ if not os.path.isfile(cfg_path):
 	print(cfg_path, "missing")
 	username = input("Username> ")
 	auth = input("Auth-Token> ")
+	while not auth:
+		print("requesting auth token")
+		payload = {
+			"response_type": "token",
+			"client_id": input("Client ID> "),
+			"redirect_uri": "http://localhost",
+			"scope": "user_read",
+		}
+		params = "&".join([key + "=" + item for key, item in payload.items()])
+		print("https://api.twitch.tv/kraken/oauth2/authorize?" + params)
+		auth = input("Auth-Token> ")
+
 	with open(cfg_path, "w") as f:
 		json.dump({
 			"auth": auth,
