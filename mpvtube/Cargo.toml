@@ -5,3 +5,4 @@ authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
 
 [dependencies]
 iron = "~0.3.0"
+mime = "~0.2.0"

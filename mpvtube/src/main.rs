@@ -1,8 +1,9 @@
 extern crate iron;
+#[macro_use]
+extern crate mime;
 
 use iron::prelude::*;
 use iron::method::Post;
-use iron::mime::Mime;
 use iron::status;
 use std::io::Read;
 use std::process::Command;
@@ -30,9 +31,7 @@ fn main() {
 		println!("{}", buffer);
 		spawn_mpv(buffer);
 
-		let content_type = "application/json".parse::<Mime>().unwrap();
-		Ok(Response::with((content_type, status::Ok, "{}")))
-
+		Ok(Response::with((mime!(Application/Json), status::Ok, "{}")))
 	}
 
 	println!("serving on :9922");
