@@ -1,0 +1,12 @@
+[package]
+name = "mediad"
+version = "0.1.0"
+authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
+
+[dependencies]
+iron = "0.3.0"
+router = "0.1.1"
+persistent = "0.1.0"
+mime = "0.2.0"
+syncbox = "0.2.4"
+urlencoded = "0.3.0"

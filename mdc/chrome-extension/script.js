@@ -2,7 +2,7 @@
 
 var XMLHttpRequest, chrome, alert
 
-function getword (info, tab) {
+function openLink (info, tab) {
   console.log(info.pageUrl, info.linkUrl)
   let xhr = new XMLHttpRequest()
 
@@ -13,14 +13,15 @@ function getword (info, tab) {
     console.log('xhr failure')
     alert('xhr failure')
   }
-  xhr.open('POST', 'http://localhost:9922/submit', true)
+  xhr.open('POST', 'http://localhost:9922/enqueue?uri=' + encodeURI(info.linkUrl), true)
   // xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8")
   // xhr.send(JSON.stringify({link: info.linkUrl}))
-  xhr.send(info.linkUrl)
+  // xhr.send(info.linkUrl)
+  xhr.send()
 }
 
 chrome.contextMenus.create({
-  title: 'Open link in MPV',
+  title: 'Send to mediad',
   contexts: ['link'],
-  onclick: getword
+  onclick: openLink
 })
