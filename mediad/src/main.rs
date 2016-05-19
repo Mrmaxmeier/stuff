@@ -6,6 +6,7 @@ extern crate persistent;
 #[macro_use]
 extern crate router;
 extern crate urlencoded;
+extern crate unix_socket;
 
 
 use iron::prelude::*;
@@ -17,25 +18,47 @@ use std::process::Command;
 use std::thread;
 use std::ops::Deref;
 use urlencoded::UrlEncodedQuery;
+use unix_socket::UnixStream;
+use std::io::prelude::*;
 
-fn spawn_mpv(media: String) {
-    println!("$ mpv {}", media);
-    match Command::new("mpv").arg(media).status() {
-        Err(e) => println!("failed to execute process: {}", e),
-        Ok(status) => println!("process exited with: {}", status),
-    }
+fn poll_connect(path: &str) -> UnixStream {
+	loop {
+		match UnixStream::connect(path) {
+			Ok(stream) => return stream,
+			Err(e) => println!("{}", e),
+		}
+		std::thread::sleep(std::time::Duration::from_secs(1));
+	}
 }
 
 
 fn spawn_player_thread(queue: LinkedQueue<Box<String>>) {
     thread::spawn(move || {
-        // TODO: spawn and control mpv with ipc
+		let path = "/tmp/mpv-sock-1337";
+		let mut cmd = Command::new("mpv");
+		cmd.arg("--input-ipc-server");
+		cmd.arg(path);
+		cmd.arg("--idle");
+		cmd.spawn().unwrap();
+		let mut stream = poll_connect(path);
+		println!("connected to mpv ipc.");
+        //stream.write_all(&[0u8; 0]);
+        //let mut buf = vec![];
+        //println!("stream: {:?}", stream.read_to_end(&mut buf));
+		//println!("stream: {:?}", buf);
         loop {
+			let mut s = String::new();
+			println!("ipc: {:?}", stream.read_to_string(&mut s));
+			println!("ipc: {:?}", s);
             let media = queue.take();
             println!("playing {}...", media);
-            spawn_mpv(*media);
             println!("waiting for queue...")
         }
+	    match cmd.status() {
+	        Err(e) => println!("failed to execute process: {}", e),
+	        Ok(status) => println!("process exited with: {}", status),
+	    }
+        drop(stream);
     });
 }
 
