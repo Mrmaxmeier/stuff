@@ -6,9 +6,13 @@ extern crate rand;
 
 use std::fs::File;
 use std::path::Path;
+use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc;
+use std::thread;
 
 use rand::{thread_rng, Rng};
 
+pub type Point = (f64, f64);
 
 pub struct PointGen {
     max_iterations: usize,
@@ -26,12 +30,12 @@ fn maybe_outside(x: f64, y: f64) -> bool {
 }
 
 impl Iterator for PointGen {
-    type Item = (f64, f64);
+    type Item = Point;
 
-    fn next(&mut self) -> Option<(f64, f64)> {
+    fn next(&mut self) -> Option<Point> {
         let offset = 0.5;
         loop {
-            let (x, y) = thread_rng().gen::<(f64, f64)>();
+            let (x, y) = thread_rng().gen::<Point>();
             let x = x * 2.0 - 1.0 - offset;
             let y = y * 2.0 - 1.0;
             if !maybe_outside(x, y) {
@@ -52,18 +56,72 @@ impl Iterator for PointGen {
 }
 
 
+pub struct ThreadedPointGen {
+    rx: Receiver<Point>,
+    count: usize,
+    max_count: usize,
+}
+
+fn threaded_point_gen(max_iterations: usize,
+                      min_iterations: usize,
+                      thread_count: usize,
+                      point_amount: usize)
+                      -> ThreadedPointGen {
+    let (tx, rx): (Sender<Point>, Receiver<Point>) = mpsc::channel();
+
+    for thread_index in 0..thread_count {
+        let thread_tx = tx.clone();
+        thread::spawn(move || {
+            let amount = match thread_index {
+                0 => point_amount - (point_amount / thread_count) * (thread_count - 1),
+                _ => point_amount / thread_count,
+            };
+            let point_generator = PointGen {
+                max_iterations: max_iterations,
+                min_iterations: min_iterations,
+            };
+            for point in point_generator.take(amount) {
+                thread_tx.send(point).unwrap();
+            }
+        });
+    }
+    ThreadedPointGen {
+        rx: rx,
+        count: 0,
+        max_count: point_amount,
+    }
+}
+
+
+impl Iterator for ThreadedPointGen {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Point> {
+        if self.count == self.max_count {
+            None
+        } else {
+            self.count += 1;
+            Some(self.rx.recv().unwrap())
+        }
+    }
+}
+
 fn main() {
-    let imgx = 800;
-    let imgy = 800;
+    let imgx = 1600;
+    let imgy = 1600;
 
     let mut imgbuf = image::ImageBuffer::new(imgx, imgy);
 
-    let max_points = std::u16::MAX as usize;
-    let point_generator = PointGen {
-        max_iterations: 10_000,
-        min_iterations: 50,
-    };
-    for (i, (x, y)) in point_generator.take(max_points).enumerate() {
+    let point_amount = std::u16::MAX as usize;
+    // let point_generator = PointGen {
+    // max_iterations: 10_000,
+    // min_iterations: 50,
+    // };
+    let max_iterations = 10_000;
+    let min_iterations = 50;
+    let threads = 8;
+    let point_generator = threaded_point_gen(max_iterations, min_iterations, threads, point_amount);
+    for (i, (x, y)) in point_generator.enumerate() {
         let x = x / 2.0 + 0.5;
         let y = y / 2.0 + 0.5;
         let ix = (x * imgx as f64) as u32;
@@ -71,8 +129,9 @@ fn main() {
         // let pixel: image::Luma<u8> = imgbuf[(ix, iy)];
         // imgbuf.put_pixel(ix, iy, image::Luma([pixel.data[0] as u8 + 100u8]));
         imgbuf.put_pixel(ix, iy, image::Luma([255u8]));
-        if i % 1000 == 0 || i == max_points {
-            println!("{} / {}", i, max_points);
+        let e = i + 1;
+        if e % 1000 == 0 || e == point_amount {
+            println!("{} / {}", e, point_amount);
         }
     }
 
@@ -124,7 +183,7 @@ mod tests {
 
     #[bench]
     fn bench_rng_floats(b: &mut Bencher) {
-        b.iter(|| thread_rng().gen::<(f64, f64)>());
+        b.iter(|| thread_rng().gen::<Point>());
     }
 
     #[bench]
