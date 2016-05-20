@@ -107,43 +107,73 @@ impl Iterator for ThreadedPointGen {
 }
 
 fn main() {
-    let imgx = 1600;
-    let imgy = 1600;
+    let imgx = 1024 * 4;
+    let imgy = 1024 * 4;
 
     let mut imgbuf = image::ImageBuffer::new(imgx, imgy);
 
-    let point_amount = std::u16::MAX as usize;
-    // let point_generator = PointGen {
-    // max_iterations: 10_000,
-    // min_iterations: 50,
-    // };
+    let point_amount = std::u16::MAX as usize * 4;
     let max_iterations = 10_000;
     let min_iterations = 50;
     let threads = 8;
     let point_generator = threaded_point_gen(max_iterations, min_iterations, threads, point_amount);
+
     for (i, (x, y)) in point_generator.enumerate() {
         let x = x / 2.0 + 0.5;
         let y = y / 2.0 + 0.5;
         let ix = (x * imgx as f64) as u32;
         let iy = (y * imgy as f64) as u32;
-        // let pixel: image::Luma<u8> = imgbuf[(ix, iy)];
-        // imgbuf.put_pixel(ix, iy, image::Luma([pixel.data[0] as u8 + 100u8]));
-        imgbuf.put_pixel(ix, iy, image::Luma([255u8]));
+        let pixel: image::Luma<u8> = imgbuf[(ix, iy)];
+        imgbuf.put_pixel(ix, iy, image::Luma([pixel.data[0] + 1u8]));
         let e = i + 1;
         if e % 1000 == 0 || e == point_amount {
             println!("{} / {}", e, point_amount);
         }
+
+        if e % 50_000 == 0 || e == point_amount {
+            let path = &*format!("images/fractal_{}.png", e / 10_000);
+            println!("saving image '{}'", path);
+            let orig = imgbuf.clone();
+            let mut imgbuf = orig.clone();
+            for (_, _, pixel) in imgbuf.enumerate_pixels_mut() {
+                let val = pixel.data[0];
+                if val == 0 {
+                    continue;
+                }
+                let l = val as usize * 256 / (e / 10_000);
+                // println!("{} = {} * 256 / {}", l, val, (e / 10_000));
+                if l > std::u8::MAX as usize {
+                    *pixel = image::Luma([std::u8::MAX]);
+                } else {
+                    *pixel = image::Luma([l as u8]);
+                }
+            }
+            let mut glowcopy = imgbuf.clone();
+            for (x, y, pixel) in glowcopy.enumerate_pixels_mut() {
+                let glow_amount = 1;
+                if x <= glow_amount || x + glow_amount >= imgx {
+                    continue;
+                }
+                if y <= glow_amount || y + glow_amount >= imgy {
+                    continue;
+                }
+                let mut glow = 0.0;
+                for ox in num::iter::range_step(x - glow_amount, x + glow_amount, 1) {
+                    for oy in num::iter::range_step(y - glow_amount, y + glow_amount, 1) {
+                        let val = orig[(ox, oy)].data[0];
+                        glow += val as f64;
+                    }
+                }
+                let glow = (glow * 20.0) as u8;
+                let val = pixel.data[0];
+                if (val as usize + glow as usize) < std::u8::MAX as usize {
+                    *pixel = image::Luma([val + glow]);
+                }
+            }
+            let mut fout = File::create(&Path::new(path)).unwrap();
+            let _ = image::ImageLuma8(glowcopy).save(&mut fout, image::PNG);
+        }
     }
-
-    // for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
-    // pixel = image::Luma([(x - y) as u8]);
-    // }
-    //
-
-
-    let mut fout = File::create(&Path::new("fractal.png")).unwrap();
-
-    let _ = image::ImageLuma8(imgbuf).save(&mut fout, image::PNG);
 }
 
 
