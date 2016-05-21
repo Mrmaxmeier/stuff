@@ -17,6 +17,7 @@ extern crate libc;
 use urlencoded::UrlEncodedQuery;
 use iron::prelude::*;
 use iron::status;
+use iron::typemap::Key;
 
 mod mpv;
 
@@ -42,16 +43,21 @@ macro_rules! get_or_return {
     }};
 }
 
+#[derive(Copy, Clone)]
+pub struct CommandAdapterState;
+
+impl Key for CommandAdapterState {
+    type Value = mpv::CommandAdapter;
+}
 
 fn main() {
     let tx = mpv::spawn_player_thread();
     let cmd = mpv::new_command_adapter(tx);
-    cmd.send(vec!["get_property".to_owned(), "time-pos".to_owned()]);
 
     let router = router!(get "/ping" => ping, post "/enqueue" => enqueue);
 
     let mut chain = Chain::new(router);
-    // chain.link(persistent::Read::<CommandAdapter>::both());
+    chain.link(persistent::Write::<CommandAdapterState>::both(cmd));
     println!("serving on :9922");
     Iron::new(chain).http("localhost:9922").unwrap();
 
@@ -61,14 +67,18 @@ fn main() {
 
     fn enqueue(req: &mut Request) -> IronResult<Response> {
         let hashmap = try_or_return!(req.get::<UrlEncodedQuery>(),
-                                     |_| Ok(Response::with((status::BadRequest, ""))));
-        let uris = get_or_return!(hashmap.get("uri"),
-                                  || Ok(Response::with((status::BadRequest, ""))));
-        // let arc = req.get::<persistent::Read<CommandAdapter>>().unwrap();
-        // let queue = arc.deref();
-        // for uri in uris {
-        // queue.put(Box::new(uri.to_owned()));
-        // }
+                                     |_| Ok(Response::with((status::BadRequest, "invalid query"))));
+        let uris = get_or_return!(hashmap.get("uri"), || {
+            Ok(Response::with((status::BadRequest, "missing uri parameter")))
+        });
+        let mutex = req.get::<persistent::Write<CommandAdapterState>>().unwrap();
+        let mut guard = mutex.lock().unwrap();
+        let ref mut adapter = *guard;
+        for uri in uris {
+            let cmd = vec!["loadfile".to_owned(), uri.to_owned()];
+            try_or_return!(adapter.send_cmd(cmd),
+                           |e| Ok(Response::with((status::BadRequest, format!("{:?}", e)))));
+        }
         Ok(Response::with((status::Ok, "")))
     }
 }

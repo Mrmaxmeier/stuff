@@ -27,9 +27,7 @@ fn poll_connect(path: &str) -> UnixStream {
 pub fn spawn_player_thread() -> mpsc::Sender<String> {
     let (tx, rx) = mpsc::channel::<String>();
     thread::spawn(move || {
-        let pid = unsafe {
-            libc::getpid()
-        };
+        let pid = unsafe { libc::getpid() };
         // FIXME: does this belong to /var/run?
         let path = &*format!("/tmp/mpv-sock-{}-{}", pid, thread_rng().gen::<u16>());
         let mut cmd = Command::new("mpv");
@@ -55,7 +53,7 @@ pub fn spawn_player_thread() -> mpsc::Sender<String> {
         for line in f.lines() {
             let line = line.unwrap();
             println!("mpv-ipc< {}", line);
-            let deserialized: MPVResponse<String> = serde_json::from_str(&line).unwrap();
+            let deserialized: MPVResponse = serde_json::from_str(&line).unwrap();
             println!("{:?}", deserialized);
         }
         match cmd.status() {
@@ -69,24 +67,29 @@ pub fn spawn_player_thread() -> mpsc::Sender<String> {
 
 #[derive(Clone)]
 pub struct CommandAdapter {
-    req_handlers: HashMap<usize, mpsc::Sender<String>>,
+    req_handlers: HashMap<usize, mpsc::Sender<MPVResponse>>,
     next_req_id: Arc<AtomicUsize>,
     mpv_tx: mpsc::Sender<String>,
 }
 
 
 impl CommandAdapter {
-    pub fn send(mut self, cmd_args: Vec<String>) -> String {
+    pub fn send_cmd(&mut self, cmd_args: Vec<String>) -> Result<usize, Box<std::error::Error>> {
         let req_id = self.next_req_id.fetch_add(1, Ordering::SeqCst);
         let cmd = MPVCommand {
             command: cmd_args,
             request_id: req_id,
         };
-        let serialized = serde_json::to_string(&cmd).unwrap();
-        self.mpv_tx.send(serialized).unwrap();
-        let (tx, rx) = mpsc::channel::<String>();
+        let serialized = try!(serde_json::to_string(&cmd));
+        try!(self.mpv_tx.send(serialized));
+        Ok(req_id)
+    }
+
+    pub fn send(&mut self, cmd_args: Vec<String>) -> Result<MPVResponse, Box<std::error::Error>> {
+        let req_id = try!(self.send_cmd(cmd_args));
+        let (tx, rx) = mpsc::channel::<MPVResponse>();
         self.req_handlers.insert(req_id, tx);
-        rx.recv().unwrap()
+        Ok(try!(rx.recv()))
     }
 }
 
@@ -108,9 +111,10 @@ struct MPVCommand {
 // { "command": ["get_property", "time-pos"], "request_id": 100 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct MPVResponse<T> {
-    data: Option<T>,
-    error: String,
-    request_id: usize,
+pub struct MPVResponse {
+    data: Option<String>,
+    error: Option<String>,
+    request_id: Option<usize>,
+    event: Option<String>,
 }
 // { "error": "success", "data": 1.468135, "request_id": 100 }

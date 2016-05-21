@@ -14,6 +14,7 @@ docopt!(Args derive Debug, "
 mediad-client.
 
 Usage:
+  mdc ping
   mdc queue <uri>
   mdc pause [--toggle]
   mdc restart
@@ -30,7 +31,7 @@ fn send(url: Url) {
                        .send()
                        .unwrap();
     match result.status {
-        StatusCode::Ok => println!("Ok"),
+        StatusCode::Ok => (),
         _   => println!("Error: {:?}", result.status),
     }
 }
@@ -38,16 +39,23 @@ fn send(url: Url) {
 fn main() {
     let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
     let mut url = Url::parse("http://localhost:9922").unwrap();
-    if args.cmd_queue {
-        println!("enqueueing '{}'...", args.arg_uri);
+    if args.cmd_ping {
+        url.set_path("ping");
+        let client = Client::new();
+        std::process::exit(match client.get(url).send() {
+            Ok(result) => match result.status {
+                StatusCode::Ok => 0,
+                _   => 1,
+            },
+            Err(_) => 1,
+        });
+    } else if args.cmd_queue {
         url.set_path("enqueue");
         url.query_pairs_mut().append_pair("uri", &*args.arg_uri);
     } else if args.cmd_pause {
-        println!("pausing...");
         url.set_path("pause");
         url.query_pairs_mut().append_pair("toggle", &*format!("{}", args.flag_toggle));
     } else if args.cmd_restart {
-        println!("restarting...");
         url.set_path("restart");
     }
     send(url);
