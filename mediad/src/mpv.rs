@@ -7,8 +7,9 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use serde_json;
+use serde;
 use rand::{thread_rng, Rng};
 use libc;
 
@@ -24,8 +25,7 @@ fn poll_connect(path: &str) -> UnixStream {
 }
 
 
-pub fn spawn_player_thread() -> mpsc::Sender<String> {
-    let (tx, rx) = mpsc::channel::<String>();
+pub fn spawn_player_thread(rx: mpsc::Receiver<String>, adapter: CommandAdapter) {
     thread::spawn(move || {
         let pid = unsafe { libc::getpid() };
         // FIXME: does this belong to /var/run?
@@ -53,28 +53,36 @@ pub fn spawn_player_thread() -> mpsc::Sender<String> {
         for line in f.lines() {
             let line = line.unwrap();
             println!("mpv-ipc< {}", line);
-            let deserialized: MPVResponse = serde_json::from_str(&line).unwrap();
+            let deserialized: GenericMPVResponse = serde_json::from_str(&line).unwrap();
             println!("{:?}", deserialized);
+            if let Some(request_id) = deserialized.request_id {
+                let req_handlers = (*adapter.req_handlers).lock().unwrap();
+                if let Some(tx) = req_handlers.get(&request_id) {
+                    tx.send(line).unwrap()
+                } else {
+                    println!("missing handler for request_id {}!", request_id);
+                }
+            }
         }
         match cmd.status() {
             Err(e) => println!("failed to execute process: {}", e),
             Ok(status) => println!("process exited with: {}", status),
         }
     });
-    tx
 }
 
+type CallbackHashmap = HashMap<usize, mpsc::Sender<String>>;
 
 #[derive(Clone)]
 pub struct CommandAdapter {
-    req_handlers: HashMap<usize, mpsc::Sender<MPVResponse>>,
+    req_handlers: Arc<Mutex<CallbackHashmap>>,
     next_req_id: Arc<AtomicUsize>,
     mpv_tx: mpsc::Sender<String>,
 }
 
 
 impl CommandAdapter {
-    pub fn send_cmd(&mut self, cmd_args: Vec<String>) -> Result<usize, Box<std::error::Error>> {
+    pub fn send(&mut self, cmd_args: Vec<String>) -> Result<usize, Box<std::error::Error>> {
         let req_id = self.next_req_id.fetch_add(1, Ordering::SeqCst);
         let cmd = MPVCommand {
             command: cmd_args,
@@ -85,21 +93,30 @@ impl CommandAdapter {
         Ok(req_id)
     }
 
-    pub fn send(&mut self, cmd_args: Vec<String>) -> Result<MPVResponse, Box<std::error::Error>> {
-        let req_id = try!(self.send_cmd(cmd_args));
-        let (tx, rx) = mpsc::channel::<MPVResponse>();
-        self.req_handlers.insert(req_id, tx);
-        Ok(try!(rx.recv()))
+    pub fn send_recv<T: serde::de::Deserialize>(&mut self, cmd_args: Vec<String>) -> Result<MPVResponse<T>, Box<std::error::Error>> {
+        let req_id = try!(self.send(cmd_args));
+        let (tx, rx) = mpsc::channel::<String>();
+        {
+            let mut req_handlers = (*self.req_handlers).lock().unwrap();
+            req_handlers.insert(req_id, tx);
+        }
+        println!("waiting for reqid {}", req_id);
+        let line = try!(rx.recv());
+        let deserialized: MPVResponse<T> = serde_json::from_str(&line).unwrap();
+        Ok(deserialized)
     }
 }
 
 
-pub fn new_command_adapter(tx: mpsc::Sender<String>) -> CommandAdapter {
-    CommandAdapter {
+pub fn new_command_adapter() -> CommandAdapter {
+    let (tx, rx) = mpsc::channel::<String>();
+    let adapter = CommandAdapter {
         mpv_tx: tx,
         next_req_id: Arc::new(AtomicUsize::new(0)),
-        req_handlers: HashMap::new(),
-    }
+        req_handlers: Arc::new(Mutex::new(HashMap::new())),
+    };
+    spawn_player_thread(rx, adapter.clone());
+    adapter
 }
 
 
@@ -108,13 +125,17 @@ struct MPVCommand {
     command: Vec<String>,
     request_id: usize,
 }
-// { "command": ["get_property", "time-pos"], "request_id": 100 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct MPVResponse {
-    data: Option<String>,
+pub struct GenericMPVResponse {
     error: Option<String>,
     request_id: Option<usize>,
     event: Option<String>,
 }
-// { "error": "success", "data": 1.468135, "request_id": 100 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MPVResponse<T> {
+    pub data: Option<T>,
+    pub error: Option<String>,
+    request_id: usize,
+}

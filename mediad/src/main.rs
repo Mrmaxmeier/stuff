@@ -1,6 +1,7 @@
 #![feature(custom_derive, plugin)]
 #![plugin(serde_macros)]
 extern crate serde_json;
+extern crate serde;
 
 extern crate iron;
 #[macro_use]
@@ -51,8 +52,13 @@ impl Key for CommandAdapterState {
 }
 
 fn main() {
-    let tx = mpv::spawn_player_thread();
-    let cmd = mpv::new_command_adapter(tx);
+    let cmd = mpv::new_command_adapter();
+
+    {
+        let mut cmd = cmd.clone();
+        let args = vec!["get_property".to_owned(), "fullscreen".to_owned()];
+        println!("property fullscreen: {:?}", cmd.send_recv::<bool>(args).unwrap().data.unwrap());
+    }
 
     let router = router!(get "/ping" => ping, post "/enqueue" => enqueue);
 
@@ -76,7 +82,7 @@ fn main() {
         let ref mut adapter = *guard;
         for uri in uris {
             let cmd = vec!["loadfile".to_owned(), uri.to_owned()];
-            try_or_return!(adapter.send_cmd(cmd),
+            try_or_return!(adapter.send(cmd),
                            |e| Ok(Response::with((status::BadRequest, format!("{:?}", e)))));
         }
         Ok(Response::with((status::Ok, "")))
