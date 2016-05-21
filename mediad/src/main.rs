@@ -1,3 +1,7 @@
+#![feature(custom_derive, plugin)]
+#![plugin(serde_macros)]
+extern crate serde_json;
+
 extern crate iron;
 #[macro_use]
 extern crate mime;
@@ -7,61 +11,14 @@ extern crate persistent;
 extern crate router;
 extern crate urlencoded;
 extern crate unix_socket;
+extern crate rand;
+extern crate libc;
 
-
+use urlencoded::UrlEncodedQuery;
 use iron::prelude::*;
 use iron::status;
-use iron::typemap::Key;
 
-use syncbox::LinkedQueue;
-use std::process::Command;
-use std::thread;
-use std::ops::Deref;
-use urlencoded::UrlEncodedQuery;
-use unix_socket::UnixStream;
-use std::io::prelude::*;
-
-fn poll_connect(path: &str) -> UnixStream {
-	loop {
-		match UnixStream::connect(path) {
-			Ok(stream) => return stream,
-			Err(e) => println!("{}", e),
-		}
-		std::thread::sleep(std::time::Duration::from_secs(1));
-	}
-}
-
-
-fn spawn_player_thread(queue: LinkedQueue<Box<String>>) {
-    thread::spawn(move || {
-		let path = "/tmp/mpv-sock-1337";
-		let mut cmd = Command::new("mpv");
-		cmd.arg("--input-ipc-server");
-		cmd.arg(path);
-		cmd.arg("--idle");
-		cmd.spawn().unwrap();
-		let mut stream = poll_connect(path);
-		println!("connected to mpv ipc.");
-        //stream.write_all(&[0u8; 0]);
-        //let mut buf = vec![];
-        //println!("stream: {:?}", stream.read_to_end(&mut buf));
-		//println!("stream: {:?}", buf);
-        loop {
-			let mut s = String::new();
-			println!("ipc: {:?}", stream.read_to_string(&mut s));
-			println!("ipc: {:?}", s);
-            let media = queue.take();
-            println!("playing {}...", media);
-            println!("waiting for queue...")
-        }
-	    match cmd.status() {
-	        Err(e) => println!("failed to execute process: {}", e),
-	        Ok(status) => println!("process exited with: {}", status),
-	    }
-        drop(stream);
-    });
-}
-
+mod mpv;
 
 macro_rules! try_or_return {
     ($res:expr, $orelse:expr) => {{
@@ -86,23 +43,15 @@ macro_rules! get_or_return {
 }
 
 
-
-#[derive(Copy, Clone)]
-pub struct MediaQueue;
-
-impl Key for MediaQueue {
-    type Value = LinkedQueue<Box<String>>;
-}
-
 fn main() {
-    let queue: LinkedQueue<Box<String>> = LinkedQueue::new();
-    spawn_player_thread(queue.clone());
-
+    let tx = mpv::spawn_player_thread();
+    let cmd = mpv::new_command_adapter(tx);
+    cmd.send(vec!["get_property".to_owned(), "time-pos".to_owned()]);
 
     let router = router!(get "/ping" => ping, post "/enqueue" => enqueue);
 
     let mut chain = Chain::new(router);
-    chain.link(persistent::Read::<MediaQueue>::both(queue));
+    // chain.link(persistent::Read::<CommandAdapter>::both());
     println!("serving on :9922");
     Iron::new(chain).http("localhost:9922").unwrap();
 
@@ -115,11 +64,11 @@ fn main() {
                                      |_| Ok(Response::with((status::BadRequest, ""))));
         let uris = get_or_return!(hashmap.get("uri"),
                                   || Ok(Response::with((status::BadRequest, ""))));
-        let arc = req.get::<persistent::Read<MediaQueue>>().unwrap();
-        let queue = arc.deref();
-        for uri in uris {
-            queue.put(Box::new(uri.to_owned()));
-        }
+        // let arc = req.get::<persistent::Read<CommandAdapter>>().unwrap();
+        // let queue = arc.deref();
+        // for uri in uris {
+        // queue.put(Box::new(uri.to_owned()));
+        // }
         Ok(Response::with((status::Ok, "")))
     }
 }
