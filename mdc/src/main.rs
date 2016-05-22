@@ -15,7 +15,7 @@ mediad-client.
 
 Usage:
   mdc ping
-  mdc queue <uri>
+  mdc queue [--replace] <uri>
   mdc pause [--toggle]
   mdc restart
   mdc (-h | --help)
@@ -55,6 +55,9 @@ fn main() {
     } else if args.cmd_pause {
         url.set_path("pause");
         url.query_pairs_mut().append_pair("toggle", &*format!("{}", args.flag_toggle));
+        if args.flag_replace {
+            url.query_pairs_mut().append_pair("replace", "true");
+        }
     } else if args.cmd_restart {
         url.set_path("restart");
     }

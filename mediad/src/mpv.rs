@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use serde_json;
-use serde;
+use serde::de::Deserialize;
 use rand::{thread_rng, Rng};
 use libc;
 
@@ -82,7 +82,8 @@ pub struct CommandAdapter {
 
 
 impl CommandAdapter {
-    pub fn send(&mut self, cmd_args: Vec<String>) -> Result<usize, Box<std::error::Error>> {
+    pub fn send(&mut self, cmd_args: Vec<&str>) -> Result<usize, Box<std::error::Error>> {
+        let cmd_args = cmd_args.iter().map(|a: &&str| (*a).to_owned()).collect::<Vec<_>>();
         let req_id = self.next_req_id.fetch_add(1, Ordering::SeqCst);
         let cmd = MPVCommand {
             command: cmd_args,
@@ -93,7 +94,9 @@ impl CommandAdapter {
         Ok(req_id)
     }
 
-    pub fn send_recv<T: serde::de::Deserialize>(&mut self, cmd_args: Vec<String>) -> Result<MPVResponse<T>, Box<std::error::Error>> {
+    pub fn send_recv<T: Deserialize>(&mut self,
+                                     cmd_args: Vec<&str>)
+                                     -> Result<MPVResponse<T>, Box<std::error::Error>> {
         let req_id = try!(self.send(cmd_args));
         let (tx, rx) = mpsc::channel::<String>();
         {

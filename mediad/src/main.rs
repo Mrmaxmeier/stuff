@@ -56,8 +56,9 @@ fn main() {
 
     {
         let mut cmd = cmd.clone();
-        let args = vec!["get_property".to_owned(), "fullscreen".to_owned()];
-        println!("property fullscreen: {:?}", cmd.send_recv::<bool>(args).unwrap().data.unwrap());
+        let args = vec!["get_property", "fullscreen"];
+        println!("property fullscreen: {:?}",
+                 cmd.send_recv::<bool>(args).unwrap().data.unwrap());
     }
 
     let router = router!(get "/ping" => ping, post "/enqueue" => enqueue);
@@ -77,11 +78,15 @@ fn main() {
         let uris = get_or_return!(hashmap.get("uri"), || {
             Ok(Response::with((status::BadRequest, "missing uri parameter")))
         });
+        let replace = match hashmap.get("replace") {
+            Some(_) => "replace",
+            None => "append-play",
+        };
         let mutex = req.get::<persistent::Write<CommandAdapterState>>().unwrap();
         let mut guard = mutex.lock().unwrap();
         let ref mut adapter = *guard;
         for uri in uris {
-            let cmd = vec!["loadfile".to_owned(), uri.to_owned()];
+            let cmd = vec!["loadfile", uri, replace];
             try_or_return!(adapter.send(cmd),
                            |e| Ok(Response::with((status::BadRequest, format!("{:?}", e)))));
         }
