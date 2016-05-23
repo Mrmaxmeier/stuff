@@ -14,7 +14,7 @@ func main() {
 	}
 
 	if isNew {
-		fmt.Println("could'nt find data.json; creating new profile")
+		fmt.Println("couldn't find data.json; creating new profile")
 	}
 
 	if client.Email == "" {

@@ -27,6 +27,7 @@ macro_rules! try_or_return {
         match $res {
             ::std::result::Result::Ok(val) => val,
             ::std::result::Result::Err(e) => {
+                println!("{:?}", e);
                 return $orelse(e)
             }
         }
@@ -84,7 +85,7 @@ fn main() {
         };
         let mutex = req.get::<persistent::Write<CommandAdapterState>>().unwrap();
         let mut guard = mutex.lock().unwrap();
-        let ref mut adapter = *guard;
+        let adapter = &mut *guard;
         for uri in uris {
             let cmd = vec!["loadfile", uri, replace];
             try_or_return!(adapter.send(cmd),
