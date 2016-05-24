@@ -27,12 +27,10 @@ Options:
 
 fn send(url: Url) {
     let client = Client::new();
-    let result = client.post(url)
-                       .send()
-                       .unwrap();
+    let result = client.post(url).send().unwrap();
     match result.status {
         StatusCode::Ok => (),
-        _   => println!("Error: {:?}", result.status),
+        _ => println!("Error: {:?}", result.status),
     }
 }
 
@@ -43,10 +41,12 @@ fn main() {
         url.set_path("ping");
         let client = Client::new();
         std::process::exit(match client.get(url).send() {
-            Ok(result) => match result.status {
-                StatusCode::Ok => 0,
-                _   => 1,
-            },
+            Ok(result) => {
+                match result.status {
+                    StatusCode::Ok => 0,
+                    _ => 1,
+                }
+            }
             Err(_) => 1,
         });
     } else if args.cmd_queue {

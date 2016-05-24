@@ -25,10 +25,44 @@ fn poll_connect(path: &str) -> UnixStream {
     }
 }
 
-
-pub fn spawn_player_thread(adapter: CommandAdapter) {
+fn spawn_ipc_write_thread(mut stream: UnixStream, rx: mpsc::Receiver<String>) {
     thread::spawn(move || {
-        let pid = unsafe { libc::getpid() };
+        for line in (&rx).iter() {
+            println!("mpv-ipc> {}", line);
+            let line = line + "\n";
+            let buf: &[u8] = &line.into_bytes();
+            if let Err(e) = stream.write_all(buf) {
+                println!("write_all error {:?}", e);
+                break;
+            }
+        }
+    });
+}
+
+fn spawn_ipc_read_thread(stream: UnixStream, adapter: CommandAdapter) {
+    thread::spawn(move || {
+        let f = BufReader::new(stream);
+        for line in f.lines() {
+            let line = line.unwrap();
+            println!("mpv-ipc< {}", line);
+            let deserialized: GenericMPVResponse = serde_json::from_str(&line).unwrap();
+            println!("{:?}", deserialized);
+            if let Some(request_id) = deserialized.request_id {
+                let req_handlers = (*adapter.req_handlers).lock().unwrap();
+                if let Some(tx) = req_handlers.get(&request_id) {
+                    tx.send(line).unwrap()
+                } else {
+                    println!("missing handler for request_id {}!", request_id);
+                }
+            }
+        }
+    });
+}
+
+fn spawn_player_thread(adapter: CommandAdapter) {
+    let pid = unsafe { libc::getpid() };
+    let adapter_clone = adapter.clone();
+    thread::spawn(move || {
         // FIXME: does this belong to /var/run?
         loop {
             let (tx, rx) = mpsc::channel::<String>();
@@ -47,41 +81,8 @@ pub fn spawn_player_thread(adapter: CommandAdapter) {
             let stream = poll_connect(path);
             println!("connected to mpv ipc socket ({})", path);
 
-            {
-                let mut stream = stream.try_clone().unwrap();
-                thread::spawn(move || {
-                    for line in (&rx).iter() {
-                        println!("mpv-ipc> {}", line);
-                        let line = line + "\n";
-                        let buf: &[u8] = &line.into_bytes();
-                        if let Err(e) = stream.write_all(buf) {
-                            println!("write_all error {:?}", e);
-                            break;
-                        }
-                    }
-                });
-            };
-
-            {
-                let adapter = adapter.clone();
-                thread::spawn(move || {
-                    let f = BufReader::new(stream);
-                    for line in f.lines() {
-                        let line = line.unwrap();
-                        println!("mpv-ipc< {}", line);
-                        let deserialized: GenericMPVResponse = serde_json::from_str(&line).unwrap();
-                        println!("{:?}", deserialized);
-                        if let Some(request_id) = deserialized.request_id {
-                            let req_handlers = (*adapter.req_handlers).lock().unwrap();
-                            if let Some(tx) = req_handlers.get(&request_id) {
-                                tx.send(line).unwrap()
-                            } else {
-                                println!("missing handler for request_id {}!", request_id);
-                            }
-                        }
-                    }
-                });
-            };
+            spawn_ipc_write_thread(stream.try_clone().unwrap(), rx);
+            spawn_ipc_read_thread(stream, adapter.clone());
 
             match child.wait() {
                 Err(e) => println!("failed to execute process: {}", e),
@@ -89,7 +90,12 @@ pub fn spawn_player_thread(adapter: CommandAdapter) {
             }
         }
     });
-    std::thread::sleep(std::time::Duration::from_millis(250));
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        if adapter_clone.mpv_tx.lock().unwrap().is_some() {
+            break;
+        }
+    }
 }
 
 type CallbackHashmap = HashMap<usize, mpsc::Sender<String>>;
@@ -121,9 +127,9 @@ impl CommandAdapter {
     }
 
     pub fn send_recv<T: Deserialize>(&mut self,
-                                     cmd_args: Vec<&str>)
+                                     args: Vec<&str>)
                                      -> Result<MPVResponse<T>, Box<Error>> {
-        let req_id = try!(self.send(cmd_args));
+        let req_id = try!(self.send(args));
         let (tx, rx) = mpsc::channel::<String>();
         {
             let mut req_handlers = (*self.req_handlers).lock().unwrap();
@@ -131,8 +137,7 @@ impl CommandAdapter {
         }
         println!("waiting for reqid {}", req_id);
         let line = try!(rx.recv());
-        let deserialized: MPVResponse<T> = serde_json::from_str(&line).unwrap();
-        Ok(deserialized)
+        Ok(try!(serde_json::from_str(&line)))
     }
 }
 
