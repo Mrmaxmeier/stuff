@@ -27,7 +27,6 @@ fn poll_connect(path: &str) -> UnixStream {
 
 
 pub fn spawn_player_thread(adapter: CommandAdapter) {
-    let adapter2 = adapter.clone();
     thread::spawn(move || {
         let pid = unsafe { libc::getpid() };
         // FIXME: does this belong to /var/run?
@@ -43,7 +42,8 @@ pub fn spawn_player_thread(adapter: CommandAdapter) {
             cmd.arg("--input-ipc-server");
             cmd.arg(path);
             cmd.arg("--idle");
-            cmd.spawn().unwrap();
+            let mut child = cmd.spawn().unwrap();
+            println!("connecting to mpv ipc socket ({})", path);
             let stream = poll_connect(path);
             println!("connected to mpv ipc socket ({})", path);
 
@@ -83,18 +83,13 @@ pub fn spawn_player_thread(adapter: CommandAdapter) {
                 });
             };
 
-            match cmd.status() {
+            match child.wait() {
                 Err(e) => println!("failed to execute process: {}", e),
                 Ok(status) => println!("process exited with: {}", status),
             }
         }
     });
-    loop {
-        std::thread::sleep(std::time::Duration::from_millis(250));
-        if adapter2.mpv_tx.lock().unwrap().is_some() {
-            break
-        }
-    }
+    std::thread::sleep(std::time::Duration::from_millis(250));
 }
 
 type CallbackHashmap = HashMap<usize, mpsc::Sender<String>>;
