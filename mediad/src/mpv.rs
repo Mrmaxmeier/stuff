@@ -153,20 +153,20 @@ pub fn new_command_adapter() -> CommandAdapter {
 }
 
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize)]
 struct MPVCommand {
     command: Vec<String>,
     request_id: usize,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct GenericMPVResponse {
     error: Option<String>,
     request_id: Option<usize>,
     event: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct MPVResponse<T> {
     pub data: Option<T>,
     pub error: Option<String>,

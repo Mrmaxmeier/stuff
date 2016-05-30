@@ -6,7 +6,6 @@ extern crate serde;
 extern crate iron;
 #[macro_use]
 extern crate mime;
-extern crate syncbox;
 extern crate persistent;
 #[macro_use]
 extern crate router;
