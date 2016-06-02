@@ -1,10 +1,10 @@
 [package]
-name = "cargo-rebuild-binaries"
+name = "cargo-rebuild"
 version = "0.1.0"
 authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
 
 [[bin]]
-name = "cargo-rebuild-binaries"
+name = "cargo-rebuild"
 
 [dependencies]
 toml = "^0.1.30"

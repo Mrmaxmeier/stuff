@@ -16,15 +16,13 @@ use std::process::Command;
 
 static USAGE: &'static str = r"
 Usage:
-    cargo
-    cargo rebuild-binaries
-    cargo rebuild [--all|--outdated]
-    cargo [--all|--outdated]
+    cargo rebuild [--all|--outdated|--verbose]
 Options:
-    --all                   Rebuild all binaries.
-    --outdated              Rebuild if older then rustc.
+    -a --all                Rebuild all binaries.
+    -o --outdated           Rebuild if older then rustc.
+    -v --verbose            Enable verbose logging.
     -h --help               Show this help page.
-    --version               Show version.
+    -V --version            Show version.
 Rebuild binaries installed with cargo.
 ";
 
@@ -33,6 +31,7 @@ Rebuild binaries installed with cargo.
 struct Args {
     flag_all: bool,
     flag_outdated: bool,
+    flag_verbose: bool,
     flag_version: bool,
 }
 
@@ -44,11 +43,24 @@ fn get_binaries(outdated: bool,
     println!("{:?}", path);
     let bin_iter = try!(path.read_dir()).filter_map(|res| res.ok());
     let filtered_iter: Vec<_> = if outdated {
+        println!("checking outdatedness");
         let mut rustc_path = path.clone();
         rustc_path.push("rustc");
-        unimplemented!();
-        // let rustc_metadata = try!(path.metadata());
-        // bin_iter.filter(|bin| true).collect()
+        let rustc_metadata = try!(path.metadata());
+        let rustc_build_date = try!(rustc_metadata.modified());
+        bin_iter.filter(|bin| {
+                if let Ok(meta) = bin.metadata() {
+                    if let Ok(modified) = meta.modified() {
+                        println!("{:?} {:?} {}",
+                                 modified,
+                                 rustc_build_date,
+                                 modified < rustc_build_date);
+                        return modified < rustc_build_date;
+                    }
+                };
+                false
+            })
+            .collect()
     } else {
         bin_iter.collect()
     };
@@ -108,16 +120,20 @@ fn main() {
         .unwrap_or_else(|err| err.exit());
 
     if args.flag_version {
-        println!("cargo-rebuild-binaries version {}",
-                 env!("CARGO_PKG_VERSION"));
+        println!("cargo-rebuild version {}", env!("CARGO_PKG_VERSION"));
         process::exit(0);
     }
 
     let mut cargo_dir = std::env::home_dir().unwrap();
     cargo_dir.push(".cargo");
 
-    let outdated = args.flag_outdated && !args.flag_all;
-    let binaries = get_binaries(outdated, &cargo_dir).unwrap();
+    let only_outdated = args.flag_outdated || !args.flag_all;
+    let binaries = get_binaries(only_outdated, &cargo_dir).unwrap();
+
+    if binaries.is_empty() {
+        println!("nothing to do...");
+        return;
+    }
 
     println!("bins: {:?}", binaries);
 
