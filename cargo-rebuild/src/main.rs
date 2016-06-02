@@ -6,15 +6,14 @@ extern crate docopt;
 extern crate rustc_serialize;
 extern crate walkdir;
 extern crate lazysort;
-
-
+extern crate ansi_term;
 
 use std::process;
 use std::collections::HashSet;
 use std::io::prelude::*;
 use std::fs::File;
 use lazysort::SortedBy;
-use std::process::Command;
+use ansi_term::Style;
 
 
 static USAGE: &'static str = r"
@@ -155,7 +154,7 @@ fn main() {
     let binaries = get_binaries(only_outdated, &home_dir.clone()).unwrap();
 
     if binaries.is_empty() {
-        println!("nothing to do...");
+        println!("Nothing to do!");
         return;
     }
 
@@ -176,7 +175,7 @@ fn main() {
         })
         .filter(|file| file.file_name() == "Cargo.toml")
         .filter_map(|file| {
-            // debug!("{:?}", file);
+            debug!("{:?}", file);
             let mut data = String::new();
             File::open(file.path()).unwrap().read_to_string(&mut data).unwrap();
             read_manifest(data)
@@ -186,21 +185,32 @@ fn main() {
                 .map(|b| (package.to_owned(), (*b).to_owned()))
                 .collect()
         })
-        .filter(|&(_, ref bin)| binaries.contains(bin));
+        .filter(|&(_, ref bin)| binaries.contains(bin))
+        .collect::<Vec<(String, String)>>();
+
+    if packages.is_empty() {
+        println!("Nothing to do!");
+        return;
+    }
 
     let mut processed_binaries = HashSet::new();
     for (package, binary) in packages {
         if processed_binaries.contains(&binary) {
             continue;
         }
-        if binary != package {
-            println!("=> Rebuilding {} [{}]", binary, package);
-        } else {
-            println!("=> Rebuilding {}", binary);
-        }
-        processed_binaries.insert(binary);
+        processed_binaries.insert(binary.clone());
 
-        let mut cmd = Command::new("cargo");
+        print!("{}", Style::new().bold().paint("> Rebuilding "));
+        if binary != package {
+            println!("{} [{}]",
+                     binary,
+                     Style::new().underline().paint(package.clone()));
+        } else {
+            println!("{}", binary);
+        }
+
+
+        let mut cmd = process::Command::new("cargo");
         cmd.arg("install")
             .arg("--force")
             .arg(package);
