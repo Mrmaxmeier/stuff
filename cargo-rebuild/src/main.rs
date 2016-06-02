@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 extern crate toml;
 extern crate docopt;
 extern crate rustc_serialize;
@@ -35,26 +38,47 @@ struct Args {
     flag_version: bool,
 }
 
+fn get_rustc_build_time() -> Result<std::time::SystemTime, std::io::Error> {
+    let home = std::env::home_dir().unwrap();
+
+    let mut multirust_toolchain_info = home.clone();
+    multirust_toolchain_info.push(".multirust/default");
+
+    let mut rustc_path = home.clone();
+
+    if let Ok(ref mut file) = File::open(&multirust_toolchain_info) {
+        let mut s = String::new();
+        try!(file.read_to_string(&mut s));
+        rustc_path.push(".multirust/toolchains");
+        rustc_path.push(s);
+    } else {
+        rustc_path.push(".cargo");
+    }
+    rustc_path.push("bin/rustc");
+
+    debug!("rustc_path: {:?}", rustc_path);
+
+    try!(rustc_path.metadata()).modified()
+}
+
 fn get_binaries(outdated: bool,
-                cargo_dir: &std::path::PathBuf)
+                home_dir: &std::path::PathBuf)
                 -> Result<HashSet<String>, std::io::Error> {
-    let mut path = cargo_dir.clone();
-    path.push("bin");
-    println!("{:?}", path);
+    let mut path = home_dir.clone();
+    path.push(".cargo/bin");
+    debug!("{:?}", path);
     let bin_iter = try!(path.read_dir()).filter_map(|res| res.ok());
     let filtered_iter: Vec<_> = if outdated {
-        println!("checking outdatedness");
-        let mut rustc_path = path.clone();
-        rustc_path.push("rustc");
-        let rustc_metadata = try!(path.metadata());
-        let rustc_build_date = try!(rustc_metadata.modified());
+        debug!("checking outdatedness");
+        let rustc_build_date = try!(get_rustc_build_time());
         bin_iter.filter(|bin| {
                 if let Ok(meta) = bin.metadata() {
                     if let Ok(modified) = meta.modified() {
-                        println!("{:?} {:?} {}",
-                                 modified,
-                                 rustc_build_date,
-                                 modified < rustc_build_date);
+                        debug!("{:?} {:?} {:?} {}",
+                               bin.path(),
+                               modified,
+                               rustc_build_date,
+                               modified < rustc_build_date);
                         return modified < rustc_build_date;
                     }
                 };
@@ -115,6 +139,7 @@ fn read_manifest(data: String) -> Option<(String, Vec<String>)> {
 
 
 fn main() {
+    env_logger::init().unwrap();
     let args = docopt::Docopt::new(USAGE)
         .and_then(|d| d.decode::<Args>())
         .unwrap_or_else(|err| err.exit());
@@ -124,22 +149,20 @@ fn main() {
         process::exit(0);
     }
 
-    let mut cargo_dir = std::env::home_dir().unwrap();
-    cargo_dir.push(".cargo");
+    let home_dir = std::env::home_dir().unwrap();
 
     let only_outdated = args.flag_outdated || !args.flag_all;
-    let binaries = get_binaries(only_outdated, &cargo_dir).unwrap();
+    let binaries = get_binaries(only_outdated, &home_dir.clone()).unwrap();
 
     if binaries.is_empty() {
         println!("nothing to do...");
         return;
     }
 
-    println!("bins: {:?}", binaries);
+    debug!("binaries: {:?}", binaries);
 
-    let mut registry_path = cargo_dir.clone();
-    registry_path.push("registry");
-    registry_path.push("src");
+    let mut registry_path = home_dir.clone();
+    registry_path.push(".cargo/registry/src");
 
     let wk = walkdir::WalkDir::new(registry_path).min_depth(3).max_depth(3);
     let packages = wk.into_iter()
@@ -153,7 +176,7 @@ fn main() {
         })
         .filter(|file| file.file_name() == "Cargo.toml")
         .filter_map(|file| {
-            // println!("{:?}", file);
+            // debug!("{:?}", file);
             let mut data = String::new();
             File::open(file.path()).unwrap().read_to_string(&mut data).unwrap();
             read_manifest(data)
@@ -170,7 +193,11 @@ fn main() {
         if processed_binaries.contains(&binary) {
             continue;
         }
-        println!("rebuilding {} [{}]", binary, package);
+        if binary != package {
+            println!("=> Rebuilding {} [{}]", binary, package);
+        } else {
+            println!("=> Rebuilding {}", binary);
+        }
         processed_binaries.insert(binary);
 
         let mut cmd = Command::new("cargo");
@@ -178,7 +205,7 @@ fn main() {
             .arg("--force")
             .arg(package);
 
-        println!("$ {:?}", cmd);
+        debug!("$ {:?}", cmd);
 
         cmd.spawn()
             .unwrap()
