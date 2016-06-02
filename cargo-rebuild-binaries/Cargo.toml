@@ -1,0 +1,14 @@
+[package]
+name = "cargo-rebuild-binaries"
+version = "0.1.0"
+authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
+
+[[bin]]
+name = "cargo-rebuild-binaries"
+
+[dependencies]
+toml = "^0.1.30"
+docopt = "^0.6.80"
+rustc-serialize = "^0.3.19"
+walkdir = "^0.1.0"
+lazysort = "^0.1.1"
