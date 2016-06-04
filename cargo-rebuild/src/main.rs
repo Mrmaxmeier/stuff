@@ -164,6 +164,7 @@ fn main() {
     registry_path.push(".cargo/registry/src");
 
     let wk = walkdir::WalkDir::new(registry_path).min_depth(3).max_depth(3);
+    let mut package_set = HashSet::new();
     let packages = wk.into_iter()
         .filter_map(|res| res.ok())
         .sorted_by(|resa, resb| {
@@ -180,6 +181,14 @@ fn main() {
             File::open(file.path()).unwrap().read_to_string(&mut data).unwrap();
             read_manifest(data)
         })
+        .filter_map(|(p, b)| {
+            if package_set.contains(&p) {
+                None
+            } else {
+                package_set.insert(p.clone());
+                Some((p, b))
+            }
+        })
         .flat_map(|(package, binaries)| -> Vec<(String, String)> {
             binaries.iter()
                 .map(|b| (package.to_owned(), (*b).to_owned()))
@@ -194,15 +203,21 @@ fn main() {
     }
 
     let mut processed_packages = HashSet::new();
+    let mut processed_binaries = HashSet::new();
     for &(ref package, ref binary) in &packages {
         if processed_packages.contains(package) {
             continue;
         }
         processed_packages.insert(package.clone());
+        if processed_binaries.contains(binary) {
+            continue;
+        }
+        processed_binaries.insert(binary.clone());
 
         let mut binaries_in_package = HashSet::new();
         for &(ref p, ref b) in &packages {
             if p == package {
+                processed_binaries.insert(b.clone());
                 binaries_in_package.insert(b);
             }
         }
