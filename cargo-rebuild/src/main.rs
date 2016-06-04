@@ -18,13 +18,16 @@ use ansi_term::Style;
 
 static USAGE: &'static str = r"
 Usage:
-    cargo rebuild [--all|--outdated|--verbose]
+    cargo rebuild [options]
+
 Options:
     -a --all                Rebuild all binaries.
     -o --outdated           Rebuild if older then rustc.
     -v --verbose            Enable verbose logging.
+    -d --dry-run            Don't actually invoke `cargo install`.
     -h --help               Show this help page.
     -V --version            Show version.
+
 Rebuild binaries installed with cargo.
 ";
 
@@ -33,6 +36,7 @@ Rebuild binaries installed with cargo.
 struct Args {
     flag_all: bool,
     flag_outdated: bool,
+    flag_dry_run: bool,
     flag_verbose: bool,
     flag_version: bool,
 }
@@ -230,6 +234,10 @@ fn main() {
             println!("");
         } else {
             println!(" [{}]", Style::new().underline().paint(package.clone()));
+        }
+
+        if args.flag_dry_run {
+            continue;
         }
 
         let mut cmd = process::Command::new("cargo");
