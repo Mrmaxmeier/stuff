@@ -12,7 +12,7 @@ use std::process;
 use std::collections::HashSet;
 use std::io::prelude::*;
 use std::fs::File;
-use lazysort::SortedBy;
+use lazysort::{SortedBy, Sorted};
 use ansi_term::Style;
 
 
@@ -193,22 +193,29 @@ fn main() {
         return;
     }
 
-    let mut processed_binaries = HashSet::new();
-    for (package, binary) in packages {
-        if processed_binaries.contains(&binary) {
+    let mut processed_packages = HashSet::new();
+    for &(ref package, ref binary) in &packages {
+        if processed_packages.contains(package) {
             continue;
         }
-        processed_binaries.insert(binary.clone());
+        processed_packages.insert(package.clone());
 
-        print!("{}", Style::new().bold().paint("> Rebuilding "));
-        if binary != package {
-            println!("{} [{}]",
-                     binary,
-                     Style::new().underline().paint(package.clone()));
-        } else {
-            println!("{}", binary);
+        let mut binaries_in_package = HashSet::new();
+        for &(ref p, ref b) in &packages {
+            if p == package {
+                binaries_in_package.insert(b);
+            }
         }
 
+        print!("{}", Style::new().bold().paint("> Rebuilding"));
+        for bin in binaries_in_package.iter().sorted() {
+            print!(" {}", bin);
+        }
+        if binaries_in_package.len() == 1 && package == binary {
+            println!("");
+        } else {
+            println!(" [{}]", Style::new().underline().paint(package.clone()));
+        }
 
         let mut cmd = process::Command::new("cargo");
         cmd.arg("install")
