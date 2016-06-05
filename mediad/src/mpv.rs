@@ -152,7 +152,6 @@ pub fn new_command_adapter() -> CommandAdapter {
     adapter
 }
 
-
 #[derive(Serialize)]
 struct MPVCommand {
     command: Vec<String>,
@@ -171,4 +170,14 @@ pub struct MPVResponse<T> {
     pub data: Option<T>,
     pub error: Option<String>,
     request_id: usize,
+}
+
+impl<T> Into<Result<T, String>> for MPVResponse<T> {
+    fn into(self) -> Result<T, String> {
+        if let Some(data) = self.data {
+            Ok(data)
+        } else {
+            Err(self.error.unwrap())
+        }
+    }
 }

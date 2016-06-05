@@ -18,6 +18,7 @@ use urlencoded::UrlEncodedQuery;
 use iron::prelude::*;
 use iron::status;
 use iron::typemap::Key;
+use serde_json::value::Value;
 
 mod mpv;
 
@@ -26,7 +27,6 @@ macro_rules! try_or_return {
         match $res {
             ::std::result::Result::Ok(val) => val,
             ::std::result::Result::Err(e) => {
-                println!("{:?}", e);
                 return $orelse(e)
             }
         }
@@ -42,6 +42,13 @@ macro_rules! get_or_return {
             }
         }
     }};
+}
+
+fn bad_request<T: std::fmt::Debug>(e: T) -> iron::IronResult<iron::Response> {
+    println!("{:?}", e);
+    let err_str = format!("{:?}", e);
+    let resp = Response::with((status::BadRequest, err_str));
+    Ok(resp)
 }
 
 #[derive(Copy, Clone)]
@@ -61,7 +68,11 @@ fn main() {
                  cmd.send_recv::<bool>(args).unwrap().data.unwrap());
     }
 
-    let router = router!(get "/ping" => ping, post "/enqueue" => enqueue);
+    let router = router!(
+        get "/ping" => ping,
+        post "/enqueue" => enqueue,
+        post "/command" => command,
+    );
 
     let mut chain = Chain::new(router);
     chain.link(persistent::Write::<CommandAdapterState>::both(cmd));
@@ -73,11 +84,8 @@ fn main() {
     }
 
     fn enqueue(req: &mut Request) -> IronResult<Response> {
-        let hashmap = try_or_return!(req.get::<UrlEncodedQuery>(),
-                                     |_| Ok(Response::with((status::BadRequest, "invalid query"))));
-        let uris = get_or_return!(hashmap.get("uri"), || {
-            Ok(Response::with((status::BadRequest, "missing uri parameter")))
-        });
+        let hashmap = try_or_return!(req.get::<UrlEncodedQuery>(), bad_request);
+        let uris = get_or_return!(hashmap.get("uri"), || bad_request("invalid url"));
         let replace = match hashmap.get("replace") {
             Some(_) => "replace",
             None => "append-play",
@@ -87,9 +95,32 @@ fn main() {
         let adapter = &mut *guard;
         for uri in uris {
             let cmd = vec!["loadfile", uri, replace];
-            try_or_return!(adapter.send(cmd),
-                           |e| Ok(Response::with((status::BadRequest, format!("{:?}", e)))));
+            try_or_return!(adapter.send(cmd), bad_request);
         }
         Ok(Response::with((status::Ok, "")))
+    }
+
+    fn command(req: &mut Request) -> IronResult<Response> {
+        let hashmap = try_or_return!(req.get::<UrlEncodedQuery>(), bad_request);
+        let no_wait = match hashmap.get("no-wait") {
+            Some(_) => true,
+            None => false,
+        };
+        let args = get_or_return!(hashmap.get("arg"), || bad_request("missing arg parameter"));
+        let args: Vec<&str> = args.iter().map(|s| &**s).collect();
+
+        let mutex = req.get::<persistent::Write<CommandAdapterState>>().unwrap();
+        let mut guard = mutex.lock().unwrap();
+        let adapter = &mut *guard; // TODO
+
+        if no_wait {
+            try_or_return!(adapter.send(args), bad_request);
+            Ok(Response::with((status::Ok, "")))
+        } else {
+            let resp = try_or_return!(adapter.send_recv::<Value>(args), bad_request);
+            let parsed = try_or_return!(resp.into(), bad_request);
+            let reserialized = try_or_return!(serde_json::to_string(&parsed), bad_request);
+            Ok(Response::with((mime!(Application / Json), status::Ok, reserialized)))
+        }
     }
 }
