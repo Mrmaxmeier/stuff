@@ -13,6 +13,7 @@ use hyper::client::Client;
 use hyper::status::StatusCode;
 use url::Url;
 use std::io::prelude::*;
+use std::path::Path;
 
 docopt!(Args derive Debug, "
 mediad-client.
@@ -22,7 +23,7 @@ Usage:
   mdc queue [--replace] <uri>
   mdc pause [--toggle]
   mdc raw [--no-response] <args>...
-  mdc playlist --all
+  mdc playlist [--all]
   mdc restart
   mdc (-h | --help)
 
@@ -48,6 +49,7 @@ enum Commands {
     Restart,
 }
 
+
 fn send(url: Url) -> hyper::client::Response {
     let client = Client::new();
     let result = client.post(url).send().unwrap();
@@ -72,6 +74,16 @@ fn mpv_cmd(url_base: &Url, args: Vec<&str>) -> String {
     let mut s = String::new();
     response.read_to_string(&mut s).unwrap();
     s
+}
+
+fn valid_file_path(path_str: &str) -> Option<String> {
+    let path = Path::new(&path_str);
+    if path.is_file() {
+        if let Ok(buf) = path.canonicalize() {
+            return buf.to_str().map(|s| s.into());
+        }
+    }
+    None
 }
 
 fn main() {
@@ -117,6 +129,7 @@ fn main() {
         Commands::Queue(replace, uri) => {
             url.set_path("enqueue");
             url.query_pairs_mut().append_pair("replace", &format!("{}", replace));
+            let uri = valid_file_path(&uri).unwrap_or_else(|| uri);
             url.query_pairs_mut().append_pair("uri", &uri);
             send(url);
         }
