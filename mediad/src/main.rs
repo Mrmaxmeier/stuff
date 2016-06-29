@@ -87,8 +87,8 @@ fn main() {
         let hashmap = try_or_return!(req.get::<UrlEncodedQuery>(), bad_request);
         let uris = get_or_return!(hashmap.get("uri"), || bad_request("invalid url"));
         let replace = match hashmap.get("replace") {
-            Some(_) => "replace",
-            None => "append-play",
+            Some(vec) if vec.get(0) == Some(&"true".to_owned()) => "replace",
+            _ => "append-play",
         };
         let mutex = req.get::<persistent::Write<CommandAdapterState>>().unwrap();
         let mut guard = mutex.lock().unwrap();
