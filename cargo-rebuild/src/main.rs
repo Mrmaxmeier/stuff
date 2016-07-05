@@ -41,22 +41,33 @@ struct Args {
     flag_version: bool,
 }
 
+fn get_multirust_toolchain(home: &std::path::PathBuf) -> Result<std::path::PathBuf, std::io::Error> {
+    let mut settings_file = home.clone();
+    settings_file.push(".multirust/settings.toml");
+
+    let mut buffer = try!(File::open(&settings_file));
+    let mut data = String::new();
+    try!(buffer.read_to_string(&mut data));
+
+    let settings = toml::Parser::new(&data).parse().unwrap();
+    if let Some(&toml::Value::String(ref default)) = settings.get("default_toolchain") {
+        let mut rustc_path = home.clone();
+        rustc_path.push(".multirust/toolchains");
+        rustc_path.push(default);
+        Ok(rustc_path)
+    } else {
+        panic!("invalid multirust settings file")
+    }
+}
+
 fn get_rustc_build_time() -> Result<std::time::SystemTime, std::io::Error> {
     let home = std::env::home_dir().unwrap();
 
-    let mut multirust_toolchain_info = home.clone();
-    multirust_toolchain_info.push(".multirust/default");
-
-    let mut rustc_path = home.clone();
-
-    if let Ok(ref mut file) = File::open(&multirust_toolchain_info) {
-        let mut s = String::new();
-        try!(file.read_to_string(&mut s));
-        rustc_path.push(".multirust/toolchains");
-        rustc_path.push(s);
-    } else {
+    let mut rustc_path = get_multirust_toolchain(&home).unwrap_or_else(|_| {
+        let mut rustc_path = home.clone();
         rustc_path.push(".cargo");
-    }
+        rustc_path
+    });
     rustc_path.push("bin/rustc");
 
     debug!("rustc_path: {:?}", rustc_path);
