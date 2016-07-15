@@ -100,13 +100,12 @@ fn daemon(progress: bool) {
 
     println!("daemoning");
     for cmd in rx.iter() {
-        println!("got cmd {:?}", cmd);
         match cmd {
-            SockCommand::Quit => return,
-            SockCommand::Lock => {
-                println!("locking...");
-                locker.ensure_locked()
+            SockCommand::Quit => {
+                println!("bye-bye");
+                return
             },
+            SockCommand::Lock => locker.ensure_locked(),
             SockCommand::Suspend => {
                 println!("suspending...");
                 suspender.suspend()

@@ -1,28 +1,31 @@
 use std::process;
-use libc;
+use std::sync::atomic::{Ordering, AtomicBool};
+use std::sync::Arc;
+use std::thread;
+use std::time::SystemTime;
 
 pub struct I3Lock {
-    process: Option<process::Child>,
+    active: Arc<AtomicBool>,
 }
 
 impl I3Lock {
     pub fn new() -> I3Lock {
-        I3Lock { process: None }
-    }
-
-    fn active(&self) -> bool {
-        match self.process {
-            None => false,
-            Some(ref child) => unsafe { libc::signal(child.id() as i32, 0) == 0 },
+        I3Lock {
+            active: Arc::new(AtomicBool::new(false))
         }
     }
 
     pub fn ensure_locked(&mut self) {
-        println!("locker active: {:?}", self.active());
-        if !self.active() {
-            let mut cmd = process::Command::new("i3lock");
-            cmd.arg("-n");
-            self.process = Some(cmd.spawn().unwrap());
+        if !self.active.compare_and_swap(false, true, Ordering::SeqCst) {
+            let active = self.active.clone();
+            thread::spawn(move || {
+                let now = SystemTime::now();
+                process::Command::new("i3lock")
+                    .arg("-n")
+                    .output().unwrap();
+                active.store(false, Ordering::SeqCst);
+                println!("unlocked after {:?}", now.elapsed());
+            });
             println!("locked.");
         }
     }
