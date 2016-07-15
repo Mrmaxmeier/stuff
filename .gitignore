@@ -4,3 +4,7 @@ lock/lock
 podplayer/data.json
 podplayer/podplayer
 podplayer/podplayer.exe
+
+# rust stuff
+target/
+*.rs.bk
