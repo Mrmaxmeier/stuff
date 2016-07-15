@@ -10,6 +10,9 @@ docopt = "*"
 docopt_macros = "*"
 rustc-serialize = "*"
 notify-rust = "*"
+enum_primitive = "*"
+num = "*"
+pbr = "*"
 
 [dependencies.x11]
 version = '*'

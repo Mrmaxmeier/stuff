@@ -13,6 +13,8 @@ use SockCommand;
 pub struct XIdleService {
     display: *mut xlib::Display,
     root: xlib::Drawable,
+    pub lock_threshold: Duration,
+    pub sleep_threshold: Duration,
 }
 
 impl XIdleService {
@@ -29,6 +31,8 @@ impl XIdleService {
         XIdleService {
             display: display,
             root: root,
+            lock_threshold: Duration::from_secs(60 * 3),
+            sleep_threshold: Duration::from_secs(60 * 10),
         }
     }
 
@@ -45,14 +49,12 @@ impl XIdleService {
     }
 
     pub fn notify(&mut self, tx: mpsc::Sender<SockCommand>) {
-        let lock_threshold = Duration::from_secs(60 * 3);
-        let sleep_threshold = Duration::from_secs(60 * 10);
         loop {
             let idle = self.idle();
-            if idle >= lock_threshold {
+            if idle >= self.lock_threshold {
                 tx.send(SockCommand::Lock).unwrap();
             }
-            if idle >= sleep_threshold {
+            if idle >= self.sleep_threshold {
                 tx.send(SockCommand::Suspend).unwrap();
             }
             thread::sleep(Duration::from_millis(500));

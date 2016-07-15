@@ -6,15 +6,24 @@ extern crate x11;
 extern crate rustc_serialize;
 extern crate docopt;
 extern crate notify_rust;
+#[macro_use]
+extern crate enum_primitive;
+extern crate num;
+extern crate pbr;
 
 use std::thread;
 use std::os::unix::net::{UnixStream, UnixListener};
 use std::io::prelude::*;
+use num::FromPrimitive;
+
+use pbr::ProgressBar;
 
 use std::sync::mpsc;
 use notify_rust::Notification;
 
 mod xidle;
+mod i3lock;
+mod suspend;
 
 docopt!(Args derive Debug, "
 lock, a simple lock-state-manager.
@@ -32,13 +41,14 @@ Options:
 
 const SOCKFILE: &'static str = "/tmp/lock.sock";
 
-#[derive(Debug)]
-pub enum SockCommand {
-    Lock = 0,
-    Suspend = 1,
-    Quit = 2,
+enum_from_primitive! {
+    #[derive(Debug)]
+    pub enum SockCommand {
+        Lock = 0,
+        Suspend = 1,
+        Quit = 2
+    }
 }
-
 
 fn daemon(progress: bool) {
     let (tx, rx) = mpsc::channel();
@@ -57,16 +67,51 @@ fn daemon(progress: bool) {
     if progress {
         thread::spawn(|| {
             let mut service = xidle::XIdleService::new();
+
+            fn mk_pb(service: &xidle::XIdleService) -> ProgressBar {
+                let mut pb = ProgressBar::new(service.lock_threshold.as_secs());
+                pb.show_speed = false;
+                pb.show_time_left = false;
+                pb
+            }
+
+            let mut pb = mk_pb(&service);
+            let mut pb_progress = 0;
+            pb.inc();
+            pb.tick();
             loop {
-                println!("idle: {:?}", service.idle());
+                let idle = service.idle();
+                //println!("idle: {:?}", service.idle());
+                //println!("till lock: {:?}", service.lock_threshold - service.idle());
+                if idle.as_secs() > pb_progress {
+                    pb_progress = pb.inc()
+                } else if pb_progress > idle.as_secs() + 1 {
+                    pb_progress = 0;
+                    pb = mk_pb(&service);
+                    pb.tick();
+                }
                 thread::sleep(std::time::Duration::from_millis(250));
             }
         });
     }
 
+    let mut locker = i3lock::I3Lock::new();
+    let mut suspender = suspend::Suspender::new();
+
     println!("daemoning");
     for cmd in rx.iter() {
         println!("got cmd {:?}", cmd);
+        match cmd {
+            SockCommand::Quit => return,
+            SockCommand::Lock => {
+                println!("locking...");
+                locker.ensure_locked()
+            },
+            SockCommand::Suspend => {
+                println!("suspending...");
+                suspender.suspend()
+            }
+        }
     }
 }
 
@@ -84,7 +129,11 @@ fn listen(tx: mpsc::Sender<SockCommand>) -> Result<(), std::io::Error> {
         thread::spawn(move || {
             for byte in stream.bytes() {
                 println!("recvd byte: {:?}", byte);
-                tx.send(SockCommand::Quit).unwrap() // TODO
+                if let Ok(byte) = byte {
+                    if let Some(cmd) = SockCommand::from_u8(byte) {
+                        tx.send(cmd).unwrap()
+                    }
+                }
             }
         });
     }
@@ -110,14 +159,12 @@ fn main() {
     } else if args.cmd_lock {
         Notification::new()
             .summary("locking remotely...")
-            .show()
-            .unwrap();
+            .show().unwrap();
         send(SockCommand::Lock).unwrap()
     } else if args.cmd_suspend {
         Notification::new()
             .summary("suspending remotely...")
-            .show()
-            .unwrap();
+            .show().unwrap();
         send(SockCommand::Suspend).unwrap()
     }
 }
