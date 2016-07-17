@@ -12,7 +12,8 @@ rustc-serialize = "*"
 notify-rust = "*"
 enum_primitive = "*"
 num = "*"
-pbr = "*"
+term = "*"
+term_size = "*"
 
 [dependencies.x11]
 version = '*'

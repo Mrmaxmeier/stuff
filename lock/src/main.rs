@@ -1,29 +1,27 @@
 #![feature(custom_derive, plugin)]
 #![plugin(docopt_macros)]
+#[macro_use] extern crate enum_primitive;
 
 extern crate libc;
 extern crate x11;
 extern crate rustc_serialize;
 extern crate docopt;
 extern crate notify_rust;
-#[macro_use]
-extern crate enum_primitive;
 extern crate num;
-extern crate pbr;
+extern crate term;
+extern crate term_size;
 
 use std::thread;
 use std::os::unix::net::{UnixStream, UnixListener};
 use std::io::prelude::*;
 use num::FromPrimitive;
-
-use pbr::ProgressBar;
-
 use std::sync::mpsc;
 use notify_rust::Notification;
 
 mod xidle;
 mod i3lock;
 mod suspend;
+mod status;
 
 docopt!(Args derive Debug, "
 lock, a simple lock-state-manager.
@@ -67,29 +65,14 @@ fn daemon(progress: bool) {
     if progress {
         thread::spawn(|| {
             let mut service = xidle::XIdleService::new();
-
-            fn mk_pb(service: &xidle::XIdleService) -> ProgressBar {
-                let mut pb = ProgressBar::new(service.lock_threshold.as_secs());
-                pb.show_speed = false;
-                pb.show_time_left = false;
-                pb
-            }
-
-            let mut pb = mk_pb(&service);
-            let mut pb_progress = 0;
-            pb.inc();
-            pb.tick();
+            let mut progress = status::ProgressBar::new(service.sleep_threshold);
+            progress.render().unwrap();
             loop {
                 let idle = service.idle();
                 //println!("idle: {:?}", service.idle());
                 //println!("till lock: {:?}", service.lock_threshold - service.idle());
-                if idle.as_secs() > pb_progress {
-                    pb_progress = pb.inc()
-                } else if pb_progress > idle.as_secs() + 1 {
-                    pb_progress = 0;
-                    pb = mk_pb(&service);
-                    pb.tick();
-                }
+                progress.current = idle;
+                progress.render().unwrap();
                 thread::sleep(std::time::Duration::from_millis(250));
             }
         });
