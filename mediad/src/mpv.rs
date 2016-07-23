@@ -71,7 +71,7 @@ fn spawn_player_thread(adapter: CommandAdapter) {
                 *mpv_tx = Some(tx);
             }
 
-            let path = &*format!("/tmp/mpv-sock-{}-{}", pid, thread_rng().gen::<u16>());
+            let path = &format!("/tmp/mpv-sock-{}-{}", pid, thread_rng().gen::<u16>());
             let mut cmd = Command::new("mpv");
             cmd.arg("--input-ipc-server");
             cmd.arg(path);
@@ -131,12 +131,18 @@ impl CommandAdapter {
                                      -> Result<MPVResponse<T>, Box<Error>> {
         let req_id = try!(self.send(args));
         let (tx, rx) = mpsc::channel::<String>();
+
         {
             let mut req_handlers = (*self.req_handlers).lock().unwrap();
             req_handlers.insert(req_id, tx);
         }
+
         println!("waiting for reqid {}", req_id);
         let line = try!(rx.recv());
+
+        let mut req_handlers = (*self.req_handlers).lock().unwrap();
+        req_handlers.remove(&req_id);
+
         Ok(try!(serde_json::from_str(&line)))
     }
 }
