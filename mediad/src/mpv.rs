@@ -19,7 +19,7 @@ fn poll_connect(path: &str) -> UnixStream {
     loop {
         match UnixStream::connect(path) {
             Ok(stream) => return stream,
-            Err(e) => println!("{}", e),
+            Err(e) => println!("can't connect to mpv socket: {}", e),
         }
         std::thread::sleep(std::time::Duration::from_millis(250));
     }
@@ -63,7 +63,6 @@ fn spawn_player_thread(adapter: CommandAdapter) {
     let pid = unsafe { libc::getpid() };
     let adapter_clone = adapter.clone();
     thread::spawn(move || {
-        // FIXME: does this belong to /var/run?
         loop {
             let (tx, rx) = mpsc::channel::<String>();
             {
@@ -71,6 +70,8 @@ fn spawn_player_thread(adapter: CommandAdapter) {
                 *mpv_tx = Some(tx);
             }
 
+            // FIXME: does this belong to /var/run?
+            // FIXME: cleanup socket
             let path = &format!("/tmp/mpv-sock-{}-{}", pid, thread_rng().gen::<u16>());
             let mut cmd = Command::new("mpv");
             cmd.arg("--input-ipc-server");

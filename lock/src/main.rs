@@ -1,4 +1,4 @@
-#![feature(custom_derive, plugin)]
+#![feature(custom_derive, plugin, question_mark)]
 #![plugin(docopt_macros)]
 #[macro_use] extern crate enum_primitive;
 
