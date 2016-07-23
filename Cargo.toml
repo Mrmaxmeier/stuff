@@ -1,0 +1,8 @@
+[package]
+authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
+name = "ansi_qr"
+version = "0.1.0"
+
+[dependencies]
+ansi_term = "0.8.0"
+qrcode = "0.2.0"
