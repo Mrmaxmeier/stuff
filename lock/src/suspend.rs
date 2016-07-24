@@ -1,5 +1,6 @@
-use std::time::{Duration,SystemTime};
+use std::time::{Duration, SystemTime};
 use std::process::Command;
+use std::thread;
 
 pub struct Suspender {
     last_resume: SystemTime,
@@ -23,6 +24,10 @@ impl Suspender {
             .arg("suspend")
             .output()
             .expect("failed to suspend");
+
+        // https://github.com/systemd/systemd/blob/36376e0b71d97e276429e0e6307f116587ac83bd/TODO#L440-L443
+        thread::sleep(Duration::from_secs(2));
+
         println!("elapsed while suspended: {:?}", now.elapsed());
         self.last_resume = SystemTime::now();
     }
