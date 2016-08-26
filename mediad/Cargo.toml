@@ -3,17 +3,12 @@ name = "mediad"
 version = "0.1.0"
 authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
 
-[replace]
-"router:0.1.1" = { git = 'https://github.com/slashgrin/router', branch = 'update_to_iron_0.4'}
-"bodyparser:0.3.0" = { git = 'https://github.com/kangaroody/body-parser' }
-"urlencoded:0.3.0" = { git = 'https://github.com/Mrmaxmeier/urlencoded' }
-
 [dependencies]
 iron = "^0.4.0"
-router = "^0.1.1"
+router = "^0.2.0"
 persistent = "^0.2.0"
 mime = "^0.2.0"
-urlencoded = "^0.3.0"
+urlencoded = "^0.4.0"
 unix_socket = "^0.5.0"
 rand = "^0.3.14"
 libc = "^0.2.11"
