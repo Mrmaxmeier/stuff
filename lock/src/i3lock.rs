@@ -22,6 +22,7 @@ impl I3Lock {
                 let now = SystemTime::now();
                 process::Command::new("i3lock")
                     .arg("-n")
+                    .arg("-c").arg("A6E22E")
                     .output().unwrap();
                 active.store(false, Ordering::SeqCst);
                 println!("unlocked after {:?}", now.elapsed());
