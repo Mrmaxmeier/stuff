@@ -1,5 +1,7 @@
-#![feature(custom_derive, plugin)]
-#![plugin(serde_macros)]
+#![feature(rustc_macro)]
+
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
 extern crate serde;
 
@@ -69,9 +71,9 @@ fn main() {
     }
 
     let router = router!(
-        get "/ping" => ping,
-        post "/enqueue" => enqueue,
-        post "/command" => command,
+        ping:    get  "/ping"    => ping,
+        enqueue: post "/enqueue" => enqueue,
+        command: post "/command" => command,
     );
 
     let mut chain = Chain::new(router);
