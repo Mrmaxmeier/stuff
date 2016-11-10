@@ -1,13 +1,16 @@
-#![feature(custom_derive, plugin)]
+#![feature(plugin)]
 #![plugin(docopt_macros)]
-#![plugin(serde_macros)]
+#![feature(proc_macro)]
+
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
 extern crate rustc_serialize;
 extern crate docopt;
 extern crate hyper;
 extern crate url;
-extern crate serde;
-extern crate serde_json;
 
 use hyper::client::Client;
 use hyper::status::StatusCode;
