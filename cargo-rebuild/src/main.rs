@@ -50,10 +50,15 @@ fn get_multirust_toolchain(home: &std::path::PathBuf) -> Result<std::path::PathB
     try!(buffer.read_to_string(&mut data));
 
     let settings = toml::Parser::new(&data).parse().unwrap();
-    if let Some(&toml::Value::String(ref default)) = settings.get("default_toolchain") {
+    if let Some(&toml::Value::String(ref default_toolchain)) = settings.get("default_toolchain") {
+        let folder = if let Some(&toml::Value::String(ref default_triple)) = settings.get("default_host_triple") {
+            format!("{}-{}", default_toolchain, default_triple)
+        } else {
+            default_toolchain.clone()
+        };
         let mut rustc_path = home.clone();
         rustc_path.push(".multirust/toolchains");
-        rustc_path.push(default);
+        rustc_path.push(folder);
         Ok(rustc_path)
     } else {
         panic!("invalid multirust settings file")
