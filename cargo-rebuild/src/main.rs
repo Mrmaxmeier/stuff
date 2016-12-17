@@ -41,9 +41,9 @@ struct Args {
     flag_version: bool,
 }
 
-fn get_multirust_toolchain(home: &std::path::PathBuf) -> Result<std::path::PathBuf, std::io::Error> {
+fn get_rustup_toolchain(home: &std::path::PathBuf) -> Result<std::path::PathBuf, std::io::Error> {
     let mut settings_file = home.clone();
-    settings_file.push(".multirust/settings.toml");
+    settings_file.push(".rustup/settings.toml");
 
     let mut buffer = try!(File::open(&settings_file));
     let mut data = String::new();
@@ -57,18 +57,18 @@ fn get_multirust_toolchain(home: &std::path::PathBuf) -> Result<std::path::PathB
             default_toolchain.clone()
         };
         let mut rustc_path = home.clone();
-        rustc_path.push(".multirust/toolchains");
+        rustc_path.push(".rustup/toolchains");
         rustc_path.push(folder);
         Ok(rustc_path)
     } else {
-        panic!("invalid multirust settings file")
+        panic!("invalid rustup settings file")
     }
 }
 
 fn get_rustc_build_time() -> Result<std::time::SystemTime, std::io::Error> {
     let home = std::env::home_dir().unwrap();
 
-    let mut rustc_path = get_multirust_toolchain(&home).unwrap_or_else(|_| {
+    let mut rustc_path = get_rustup_toolchain(&home).unwrap_or_else(|_| {
         let mut rustc_path = home.clone();
         rustc_path.push(".cargo");
         rustc_path
@@ -111,7 +111,7 @@ fn get_binaries(outdated: bool,
     let binaries = filtered_iter.iter()
         .map(|b| b.file_name().into_string().unwrap())
         .filter(|b| match b.as_ref() {
-            "rustc" | "rustdoc" | "cargo" | "multirust" | "rustup" => false,
+            "rustc" | "rustdoc" | "cargo" | "rustup" => false,
             _ => true,
         })
         .collect();
