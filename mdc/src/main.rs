@@ -1,16 +1,12 @@
-#![feature(plugin)]
-#![plugin(docopt_macros)]
-#![feature(proc_macro)]
-
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
 
-extern crate rustc_serialize;
-extern crate docopt;
 extern crate hyper;
 extern crate url;
+#[macro_use]
+extern crate clap;
 
 use hyper::client::Client;
 use hyper::status::StatusCode;
@@ -20,40 +16,12 @@ use std::path::Path;
 use std::time::Duration;
 use std::thread::sleep;
 
-docopt!(Args derive Debug, "
-mediad-client.
-
-Usage:
-  mdc ping
-  mdc queue [--replace] <uri>
-  mdc pause [--toggle]
-  mdc raw [--no-response] <args>...
-  mdc playlist [--all]
-  mdc restart
-  mdc (-h | --help)
-
-Options:
-  -h --help     Show this screen.
-  -v --verbose  Display verbose logs.
-");
-
-
 #[derive(Debug, PartialEq, Deserialize)]
 struct PlaylistEntry {
     filename: String,
     playing: Option<bool>,
     current: Option<bool>,
 }
-
-enum Commands {
-    Ping,
-    Queue(bool, String),
-    Pause(bool),
-    Raw(bool, Vec<String>),
-    Playlist,
-    Restart,
-}
-
 
 fn send(url: Url) -> hyper::client::Response {
     let client = Client::new();
@@ -109,28 +77,31 @@ fn valid_file_path(path_str: &str) -> Option<String> {
 }
 
 fn main() {
-    let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
-
-    let command = if args.cmd_ping {
-        Commands::Ping
-    } else if args.cmd_queue {
-        Commands::Queue(args.flag_replace, args.arg_uri)
-    } else if args.cmd_pause {
-        Commands::Pause(args.flag_toggle)
-    } else if args.cmd_raw {
-        Commands::Raw(args.flag_no_response, args.arg_args)
-    } else if args.cmd_playlist {
-        Commands::Playlist
-    } else if args.cmd_restart {
-        Commands::Restart
-    } else {
-        unreachable!()
-    };
-
+    let matches = clap_app!(mdc =>
+        (version: "1.0")
+        (about: "A cli for mediad")
+        (settings: &[clap::AppSettings::SubcommandRequired])
+        (@subcommand ping => (about: "Checks connectivity"))
+        (@subcommand queue =>
+            (about: "Queues an entry into the playlist")
+            (@arg replace: -r --replace "Replaces current playing file with the new queued one")
+            (@arg INPUT: +required "The URI"))
+        (@subcommand pause =>
+            (about: "Pauses the current playback")
+            (@arg toggle: -t --toggle "Toggles playing state instead of setting it to paused"))
+        (@subcommand restart => (about: "Restarts mediad and restores the previous state"))
+        (@subcommand playlist =>
+            (about: "Displays the current playlist")
+            (@arg all: -a --all "Includes played entries"))
+        (@subcommand raw =>
+            (about: "Sends a raw command to mpv")
+            (@arg no_response: -n --no-response "Returns immediately")
+            (@arg INPUT: +required +multiple "Command args"))
+    ).get_matches();
 
     let mut url = Url::parse("http://localhost:9922").unwrap();
-    match command {
-        Commands::Ping => {
+    match matches.subcommand() {
+        ("ping",  _) => {
             url.set_path("ping");
             let client = Client::new();
             std::process::exit(match client.get(url).send() {
@@ -139,40 +110,43 @@ fn main() {
                         StatusCode::Ok => 0,
                         _ => 1,
                     }
-                }
+                },
                 Err(_) => 1,
             });
-        }
-        Commands::Pause(toggle) => {
+        },
+        ("pause", Some(options)) => {
             url.set_path("pause");
+            let toggle = options.is_present("toggle");
             url.query_pairs_mut().append_pair("toggle", &format!("{}", toggle));
             send(url);
-        }
-        Commands::Queue(replace, uri) => {
+        },
+        ("queue", Some(options)) => {
             url.set_path("enqueue");
+            let replace = options.is_present("replace");
             url.query_pairs_mut().append_pair("replace", &format!("{}", replace));
-            let uri = valid_file_path(&uri).unwrap_or_else(|| uri);
+            let uri = options.value_of("INPUT").unwrap();
+            let uri = valid_file_path(&uri).unwrap_or_else(|| uri.into());
             url.query_pairs_mut().append_pair("uri", &uri);
             send(url);
-        }
-        Commands::Raw(no_response, args) => {
+        },
+        ("raw", Some(options)) => {
             url.set_path("command");
             {
                 let mut query_pairs = url.query_pairs_mut();
-                for arg in args {
+                for arg in options.values_of("INPUT").unwrap() {
                     query_pairs.append_pair("arg", &arg);
                 }
-                if no_response {
+                if options.is_present("no_response") {
                     query_pairs.append_pair("no-wait", "1");
                 }
             }
             let mut response = send(url);
-            println!("{:?}", response);
+            println!("{:#?}", response);
             let mut s = String::new();
             println!("{:?}", response.read_to_string(&mut s));
             println!("{}", s);
-        }
-        Commands::Playlist => {
+        },
+        ("playlist", Some(options)) => {
             let data = mpv_cmd(&url, vec!["get_property", "playlist"]);
 
             let playlist: Vec<PlaylistEntry> = serde_json::from_str(&data).unwrap();
@@ -185,12 +159,12 @@ fn main() {
                     print!("> ");
                     found_current = true;
                 }
-                if found_current || args.flag_all {
+                if found_current || options.is_present("all") {
                     println!("{}", entry.filename);
                 }
             }
         }
-        Commands::Restart => {
+        ("restart", _) => {
             let playlist_data = mpv_cmd(&url, vec!["get_property", "playlist"]);
             let playlist: Vec<PlaylistEntry> = serde_json::from_str(&playlist_data).unwrap();
             let time: f64 = mpv_cmd(&url, vec!["get_property", "time-pos"]).parse().unwrap();
@@ -218,6 +192,7 @@ fn main() {
                     sleep(Duration::from_secs(2));
                 }
             }
-        }
+        },
+        _ => { panic!("invalid subcommand") },
     }
 }
