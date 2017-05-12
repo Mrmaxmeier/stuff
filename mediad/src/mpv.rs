@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use serde_json;
-use serde::de::Deserialize;
+use serde::de::DeserializeOwned;
 use rand::{thread_rng, Rng};
 use std::error::Error;
 use libc;
@@ -127,9 +127,7 @@ impl CommandAdapter {
         tx.clone().unwrap().send(s)
     }
 
-    pub fn send_recv<T: Deserialize>(&mut self,
-                                     args: Vec<&str>)
-                                     -> Result<MPVResponse<T>, Box<Error>> {
+    pub fn send_recv<T: DeserializeOwned>(&mut self, args: Vec<&str>) -> Result<MPVResponse<T>, Box<Error>> {
         let req_id = try!(self.send(args));
         let (tx, rx) = mpsc::channel::<String>();
 
@@ -144,7 +142,7 @@ impl CommandAdapter {
         let mut req_handlers = (*self.req_handlers).lock().unwrap();
         req_handlers.remove(&req_id);
 
-        Ok(try!(serde_json::from_str(&line)))
+        Ok(serde_json::from_str(&line)?)
     }
 }
 

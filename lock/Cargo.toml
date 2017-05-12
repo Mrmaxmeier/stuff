@@ -1,20 +1,18 @@
 [package]
+authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
 name = "lock"
 version = "0.1.0"
-authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
 
 [dependencies]
-x11-dl = "*"
+clap = "2.24.1"
+enum_primitive = "^0.1.1"
 libc = "*"
-docopt = "*"
-docopt_macros = "*"
-rustc-serialize = "*"
-notify-rust = "*"
-enum_primitive = "*"
-num = "*"
-term = "*"
-term_size = "*"
+notify-rust = "^3.3.1"
+num = "^0.1.37"
+term = "^0.4.5"
+term_size = "^0.3.0"
+x11-dl = "^2.13.0"
 
 [dependencies.x11]
-version = '*'
 features = ["xlib", "xss"]
+version = "^2.13.0"

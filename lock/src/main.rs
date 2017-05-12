@@ -1,15 +1,13 @@
-#![feature(custom_derive, plugin, question_mark)]
-#![plugin(docopt_macros)]
 #[macro_use] extern crate enum_primitive;
 
 extern crate libc;
 extern crate x11;
-extern crate rustc_serialize;
-extern crate docopt;
 extern crate notify_rust;
 extern crate num;
 extern crate term;
 extern crate term_size;
+#[macro_use]
+extern crate clap;
 
 use std::thread;
 use std::os::unix::net::{UnixStream, UnixListener};
@@ -22,20 +20,6 @@ mod xidle;
 mod i3lock;
 mod suspend;
 mod status;
-
-docopt!(Args derive Debug, "
-lock, a simple lock-state-manager.
-
-Usage:
-  lock daemon [--progress]
-  lock lock
-  lock suspend
-  lock (-h | --help)
-
-Options:
-  -h --help     Show this screen.
-  -v --verbose  Display verbose logs.
-");
 
 const SOCKFILE: &'static str = "/tmp/lock.sock";
 
@@ -131,22 +115,36 @@ fn send(command: SockCommand) -> Result<(), std::io::Error> {
 
 
 fn main() {
-    let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
+    let matches = clap_app!(lock =>
+        (version: "1.0")
+        (about: "lock, a simple lock-state-manager")
+        (settings: &[clap::AppSettings::SubcommandRequired])
+        (@subcommand lock => (about: "Locks the current session"))
+        (@subcommand suspend => (about: "Suspends the current session"))
+        (@subcommand daemon =>
+            (about: "Runs the lock daemon")
+            (@arg progress: -p --progress "Displays a cli-hud containing the current state"))
+    ).get_matches();
 
-    if args.cmd_daemon {
-        if send(SockCommand::Quit).is_ok() {
-            println!("stopped other daemon...");
-        }
-        daemon(args.flag_progress)
-    } else if args.cmd_lock {
-        Notification::new()
-            .summary("locking remotely...")
-            .show().unwrap();
-        send(SockCommand::Lock).unwrap()
-    } else if args.cmd_suspend {
-        Notification::new()
-            .summary("suspending remotely...")
-            .show().unwrap();
-        send(SockCommand::Suspend).unwrap()
+    match matches.subcommand() {
+        ("daemon",  Some(options)) => {
+            if send(SockCommand::Quit).is_ok() {
+                println!("stopped other daemon...");
+            }
+            daemon(options.is_present("progress"))
+        },
+        ("lock", _) => {
+            Notification::new()
+                .summary("locking remotely...")
+                .show().unwrap();
+            send(SockCommand::Lock).unwrap()
+        },
+        ("suspend", _) => {
+            Notification::new()
+                .summary("suspending remotely...")
+                .show().unwrap();
+            send(SockCommand::Suspend).unwrap()
+        },
+        _ => { unreachable!() },
     }
 }
