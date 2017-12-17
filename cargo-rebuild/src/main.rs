@@ -12,6 +12,8 @@ use std::process;
 use std::collections::HashSet;
 use std::io::prelude::*;
 use std::fs::File;
+
+use toml::Value;
 use lazysort::{SortedBy, Sorted};
 use ansi_term::Style;
 
@@ -49,7 +51,7 @@ fn get_rustup_toolchain(home: &std::path::PathBuf) -> Result<std::path::PathBuf,
     let mut data = String::new();
     try!(buffer.read_to_string(&mut data));
 
-    let settings = toml::Parser::new(&data).parse().unwrap();
+    let settings = data.parse::<Value>()?;
     if let Some(&toml::Value::String(ref default_toolchain)) = settings.get("default_toolchain") {
         let folder = if let Some(&toml::Value::String(ref default_triple)) = settings.get("default_host_triple") {
             format!("{}-{}", default_toolchain, default_triple)
@@ -120,10 +122,10 @@ fn get_binaries(outdated: bool,
 }
 
 fn read_manifest(data: String) -> Option<(String, Vec<String>)> {
-    let manifest = match toml::Parser::new(&data).parse() {
-        Some(val) => val,
-        None => return None,
-    };
+    let manifest = data.parse::<Value>()?;
+    let package = manifest["package"]?;
+    let name = manifest["name"]?;
+    /*
     let package = match manifest.get("package") {
         Some(&toml::Value::Table(ref package)) => package,
         _ => return None,
@@ -133,6 +135,7 @@ fn read_manifest(data: String) -> Option<(String, Vec<String>)> {
         Some(&toml::Value::String(ref name)) => name.to_owned(),
         _ => return None,
     };
+    */
 
     let bin_tables = match manifest.get("bin") {
         Some(&toml::Value::Array(ref bin_tables)) => bin_tables,
