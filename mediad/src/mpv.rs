@@ -110,7 +110,7 @@ pub struct CommandAdapter {
 
 
 impl CommandAdapter {
-    pub fn send(&mut self, cmd_args: Vec<&str>) -> Result<usize, Box<Error>> {
+    pub fn send(&self, cmd_args: Vec<&str>) -> Result<usize, Box<Error>> {
         let cmd_args = cmd_args.iter().map(|a: &&str| (*a).to_owned()).collect::<Vec<_>>();
         let req_id = self.next_req_id.fetch_add(1, Ordering::SeqCst);
         let cmd = MPVCommand {
@@ -127,7 +127,7 @@ impl CommandAdapter {
         tx.clone().unwrap().send(s)
     }
 
-    pub fn send_recv<T: DeserializeOwned>(&mut self, args: Vec<&str>) -> Result<MPVResponse<T>, Box<Error>> {
+    pub fn send_recv<T: DeserializeOwned>(&self, args: Vec<&str>) -> Result<MPVResponse<T>, Box<Error>> {
         let req_id = try!(self.send(args));
         let (tx, rx) = mpsc::channel::<String>();
 
@@ -175,14 +175,4 @@ pub struct MPVResponse<T> {
     pub data: Option<T>,
     pub error: Option<String>,
     request_id: usize,
-}
-
-impl<T> Into<Result<T, String>> for MPVResponse<T> {
-    fn into(self) -> Result<T, String> {
-        if let Some(data) = self.data {
-            Ok(data)
-        } else {
-            Err(self.error.unwrap())
-        }
-    }
 }
