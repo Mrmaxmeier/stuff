@@ -75,7 +75,8 @@ known_types = {
 	"PullRequestEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["pull_request"]["title"]), repoName(d)),
 	"ForkEvent": lambda d: "{} forked {}".format(actorName(d), repoName(d)),
 	"ReleaseEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["release"]["name"]), repoName(d)),
-	"GollumEvent": lambda d: "{}\n{}\n@{}".format(actorName(d), "\n".join(["{} '{}'".format(p['action'], p['title']) for p in d['payload']['pages']]), repoName(d))
+	"GollumEvent": lambda d: "{}\n{}\n@{}".format(actorName(d), "\n".join(["{} '{}'".format(p['action'], p['title']) for p in d['payload']['pages']]), repoName(d)),
+	"PullRequestReviewCommentEvent": lambda d: "{} reviewed '{}'".format(actorName(d), shortened(d["payload"]["pull_request"]["title"]))
 }
 
 def tostring(d):
