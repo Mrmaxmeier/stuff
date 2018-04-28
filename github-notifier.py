@@ -19,12 +19,14 @@ if not os.path.isfile(cfg_path):
 	print(cfg_path, "missing")
 	username = input("Username: ")
 	pw = getpass.getpass()
-	print("requesting access token...")
+        print("requesting access token for scopes:")
+        scopes = ["notifications", "repo", "user", "read:discussion", "gist"]
+        print(scopes)
 
 	auth = requests.auth.HTTPBasicAuth(username, pw)
 
 	headers = {"Accept": "application/vnd.github.v3+json"}
-	data = dict(scopes=["notifications"], note="github-notifier.py auth")
+	data = dict(scopes=scopes, note="github-notifier.py auth")
 	pprint(data)
 	r = requests.post("https://api.github.com/authorizations", headers=headers, auth=auth, json=data).json()
 	pprint(r)
