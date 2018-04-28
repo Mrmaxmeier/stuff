@@ -1,14 +1,14 @@
 #!/usr/bin/python3
-
-import requests
-import time
-import arrow
-import json
+from pprint import pprint
 import sys
 import os
+import time
+import json
 import getpass
+
+import requests
+import arrow
 import sh
-from pprint import pprint
 
 if len(sys.argv) > 1:
 	cfg_path = sys.argv[1]
@@ -19,9 +19,20 @@ if not os.path.isfile(cfg_path):
 	print(cfg_path, "missing")
 	username = input("Username: ")
 	pw = getpass.getpass()
+	print("requesting access token...")
+
+	auth = requests.auth.HTTPBasicAuth(username, pw)
+
+	headers = {"Accept": "application/vnd.github.v3+json"}
+	data = dict(scopes=["notifications"], note="github-notifier.py auth")
+	pprint(data)
+	r = requests.post("https://api.github.com/authorizations", headers=headers, auth=auth, json=data).json()
+	pprint(r)
+	token = r["token"]
+
 	with open(cfg_path, "w") as f:
 		json.dump({
-			"login": (username, pw),
+			"token": token,
 			"username": username,
 			"data": {},
 			"last_event": str(arrow.now())
@@ -30,14 +41,9 @@ if not os.path.isfile(cfg_path):
 with open(cfg_path, "r") as f:
 	cfg = json.load(f)
 
-if any([len(s) < 1 for s in cfg["login"]]):
-	login = None
-else:
-	login = cfg["login"]
-
 etag = None
 last_event = arrow.get(cfg["last_event"])
-auth = requests.auth.HTTPBasicAuth(login[0], login[1]) if login else None
+auth = "token " + cfg["token"]
 
 blocking = ["i3lock"]
 required = ["i3"]
@@ -62,8 +68,7 @@ def shortened(msg, length=55):
 	msg = msg.strip("\n")
 	if len(msg.split("\n")) < 2 and len(msg) <= length:
 		return msg
-	else:
-		return msg.split("\n")[0][:length] + " [...]"
+	return msg.split("\n")[0][:length] + " [...]"
 
 known_types = {
 	"PushEvent": lambda d: "\n".join([c["author"]["name"] + ": " + shortened(c["message"]) for c in d["payload"]["commits"]]) + "\n@" + d["repo"]["name"],
@@ -99,11 +104,11 @@ notified_start = False
 
 print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 while True:
-	headers = {"Accept": "application/vnd.github.v3+json"}
+	headers = {"Accept": "application/vnd.github.v3+json", "Authorization": auth}
 	if etag:
 		headers["If-None-Match"] = etag
 	try:
-		r = requests.get("https://api.github.com/users/" + cfg["username"] + "/received_events", headers=headers, auth=auth)
+		r = requests.get("https://api.github.com/users/" + cfg["username"] + "/received_events", headers=headers)
 	except requests.exceptions.ConnectionError as e:
 		print(e)
 		time.sleep(60)
@@ -126,7 +131,7 @@ while True:
 		try:
 			sh.pgrep(pname)
 			blocked = True
-			if len(tobenotified) > 0:
+			if tobenotified:
 				print("{} notifications blocked by {}".format(len(tobenotified), pname))
 			break
 		except sh.ErrorReturnCode_1:
