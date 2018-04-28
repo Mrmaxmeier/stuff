@@ -3,10 +3,11 @@
 import os
 import sys
 import json
-import requests
 import time
-import sh
 from pprint import pprint
+
+import requests
+import sh
 
 if len(sys.argv) > 1:
 	cfg_path = sys.argv[1]
@@ -17,6 +18,7 @@ else:
 if not os.path.isfile(cfg_path):
 	print(cfg_path, "missing")
 	username = input("Username> ")
+	print("Press enter to generate new auth token...")
 	auth = input("Auth-Token> ")
 	while not auth:
 		print("requesting auth token")
@@ -66,7 +68,7 @@ while True:
 			print(res)
 			time.sleep(delay)
 			continue
-	except json.JSONDecodeError as e:
+	except Exception as e:
 		print(e)
 		sh.notify_send("Twitch", str(e), urgency="low")
 		time.sleep(delay)
@@ -83,6 +85,7 @@ while True:
 		if username in data["data"]:
 			if data["data"][username]["notify"] and data["data"][username]["last_processed"] < time.time() - delay * 5:
 				tobenotified.append(display)
+				print("[*] {} ({}) {}".format(display, game, time.strftime("%Y-%m-%d %H:%M:%S")))
 			data["data"][username]["last_processed"] = time.time()
 		else:
 			data["data"][username] = {
