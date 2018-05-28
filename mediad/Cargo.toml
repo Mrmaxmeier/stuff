@@ -5,10 +5,14 @@ version = "0.1.0"
 
 [dependencies]
 libc = "^0.2.11"
-rand = "^0.3.14"
-rocket = "0.3.4"
-rocket_codegen = "0.3.4"
-rocket_contrib = "0.3.4"
+rand = "0.4.2"
+#rocket = "0.3.6"
+#rocket_codegen = "0.3.6"
+#rocket_contrib = "0.3.6"
+rocket = { git = "https://github.com/SergioBenitez/Rocket" }
+rocket_codegen = { git = "https://github.com/SergioBenitez/Rocket" }
+rocket_contrib = { git = "https://github.com/SergioBenitez/Rocket" }
+
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
