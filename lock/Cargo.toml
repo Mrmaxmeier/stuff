@@ -4,15 +4,15 @@ name = "lock"
 version = "0.1.0"
 
 [dependencies]
-clap = "2.24.1"
-enum_primitive = "^0.1.1"
-libc = "*"
-notify-rust = "^3.3.1"
-num = "^0.1.37"
-term = "^0.4.5"
-term_size = "^0.3.0"
-x11-dl = "^2.13.0"
+clap = "2.31.2"
+enum_primitive = "0.1.1"
+libc = "0.2.41"
+notify-rust = "3.4.2"
+num = "0.1.42"
+term = "0.5.1"
+term_size = "0.3.1"
+x11-dl = "2.17.5"
 
 [dependencies.x11]
 features = ["xlib", "xss"]
-version = "^2.13.0"
+version = "2.17.5"
