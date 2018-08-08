@@ -25,7 +25,9 @@ struct PlaylistEntry {
 
 fn send(url: Url) -> hyper::client::Response {
     let client = Client::new();
-    let result = client.post(url).send().unwrap();
+    let result = client.post(url)
+        .send()
+        .unwrap();
     match result.status {
         StatusCode::Ok => (),
         _ => println!("Error: {:?}", result.status),
