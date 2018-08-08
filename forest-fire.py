@@ -18,8 +18,8 @@ STATES = {
 
 TREE_CHANCE = .1
 BURN_CHANCE = .25
-DECAY_CHANCE = .5
-FRAME_DELAY = 0.1
+DECAY_CHANCE = .6
+FRAME_DELAY = .075
 
 TREE_STR = '#' #"🎄"
 EMPTY_STR = " "
@@ -36,7 +36,7 @@ Size = namedtuple('size', ['x', 'y'])
 
 def getTermSize():
 	size = shutil.get_terminal_size((80, 20))
-	return Size(x=size.columns // 2, y=size.lines-1)
+	return Size(x=size.columns // 2, y=size.lines)
 
 def rnd(chance):
 	return random.random() < chance
