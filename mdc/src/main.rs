@@ -127,7 +127,7 @@ fn main() {
             let replace = options.is_present("replace");
             url.query_pairs_mut().append_pair("replace", &format!("{}", replace));
             let uri = options.value_of("INPUT").unwrap();
-            let uri = valid_file_path(&uri).unwrap_or_else(|| uri.into());
+            let uri = valid_file_path(uri).unwrap_or_else(|| uri.into());
             url.query_pairs_mut().append_pair("uri", &uri);
             send(url);
         },
@@ -136,7 +136,7 @@ fn main() {
             {
                 let mut query_pairs = url.query_pairs_mut();
                 for arg in options.values_of("INPUT").unwrap() {
-                    query_pairs.append_pair("arg", &arg);
+                    query_pairs.append_pair("arg", arg);
                 }
                 if options.is_present("no_response") {
                     query_pairs.append_pair("no-wait", "1");

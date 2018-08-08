@@ -4,7 +4,7 @@ use x11::xlib;
 
 use std::time::Duration;
 use std::mem::zeroed;
-use std::ptr::{null, null_mut};
+use std::ptr::null;
 use std::sync::mpsc;
 use std::thread;
 
@@ -21,7 +21,7 @@ impl XIdleService {
     pub fn new() -> XIdleService {
         let (display, root) = unsafe {
             let display = xlib::XOpenDisplay(null());
-            if display == null_mut() {
+            if display.is_null() {
                 panic!("can't open display");
             };
             let root = xlib::XRootWindow(display, xlib::XDefaultScreen(display));
