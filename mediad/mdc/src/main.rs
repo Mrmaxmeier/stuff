@@ -54,7 +54,7 @@ struct CommandData {
     args: Vec<String>,
 }
 
-fn mpv_cmd<T: serde::de::DeserializeOwned>(args: Vec<&str>) -> T {
+fn mpv_cmd<T: serde::de::DeserializeOwned>(args: &[&str]) -> T {
     send_json(
         "command",
         CommandData {
@@ -64,7 +64,7 @@ fn mpv_cmd<T: serde::de::DeserializeOwned>(args: Vec<&str>) -> T {
     )
 }
 
-fn mpv_cmd_nr(args: Vec<&str>) {
+fn mpv_cmd_nr(args: &[&str]) {
     send_json::<CommandData, serde_json::Value>(
         "command",
         CommandData {
@@ -155,7 +155,7 @@ fn main() {
             println!("{}", s);
         }
         ("playlist", Some(options)) => {
-            let playlist: Vec<PlaylistEntry> = mpv_cmd(vec!["get_property", "playlist"]);
+            let playlist: Vec<PlaylistEntry> = mpv_cmd(&["get_property", "playlist"]);
 
             let mut found_current = false;
             for entry in playlist {
@@ -172,12 +172,12 @@ fn main() {
             }
         }
         ("restart", _) => {
-            let playlist: Vec<PlaylistEntry> = mpv_cmd(vec!["get_property", "playlist"]);
-            let time: f64 = mpv_cmd(vec!["get_property", "time-pos"]);
+            let playlist: Vec<PlaylistEntry> = mpv_cmd(&["get_property", "playlist"]);
+            let time: f64 = mpv_cmd(&["get_property", "time-pos"]);
             println!("playlist: {:#?}", playlist);
             println!("time current: {}", time);
             println!("quitting mpv...");
-            mpv_cmd_nr(vec!["quit"]);
+            mpv_cmd_nr(&["quit"]);
             sleep(Duration::from_secs(1));
             let mut found_current = false;
             for entry in &playlist {
@@ -187,7 +187,7 @@ fn main() {
                 if found_current {
                     println!("queueing {:?}", entry.filename);
                     let _: serde_json::Value =
-                        mpv_cmd(vec!["loadfile", &*entry.filename, "append-play"]);
+                        mpv_cmd(&["loadfile", &*entry.filename, "append-play"]);
                     sleep(Duration::from_secs(2));
                 }
 
@@ -196,7 +196,7 @@ fn main() {
                     sleep(Duration::from_secs(5)); // TODO wait for actual events
                     println!("seeking to {:?}", time);
                     let _: serde_json::Value =
-                        mpv_cmd(vec!["seek", &*format!("{}", time), "absolute+keyframes"]);
+                        mpv_cmd(&["seek", &*format!("{}", time), "absolute+keyframes"]);
                     sleep(Duration::from_secs(2));
                 }
             }
