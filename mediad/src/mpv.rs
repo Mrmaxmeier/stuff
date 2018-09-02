@@ -1,18 +1,18 @@
+use libc;
+use rand::{thread_rng, Rng};
+use serde::de::DeserializeOwned;
+use serde_json;
 use std;
-use std::process::Command;
-use std::thread;
-use std::sync::mpsc;
-use unix_socket::UnixStream;
+use std::collections::HashMap;
+use std::error::Error;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::collections::HashMap;
+use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use serde_json;
-use serde::de::DeserializeOwned;
-use rand::{thread_rng, Rng};
-use std::error::Error;
-use libc;
+use std::thread;
+use unix_socket::UnixStream;
 
 fn poll_connect(path: &str) -> UnixStream {
     std::thread::sleep(std::time::Duration::from_millis(250));
@@ -108,10 +108,12 @@ pub struct CommandAdapter {
     mpv_tx: Arc<Mutex<Option<mpsc::Sender<String>>>>,
 }
 
-
 impl CommandAdapter {
     pub fn send(&self, cmd_args: Vec<&str>) -> Result<usize, Box<Error>> {
-        let cmd_args = cmd_args.iter().map(|a: &&str| (*a).to_owned()).collect::<Vec<_>>();
+        let cmd_args = cmd_args
+            .iter()
+            .map(|a: &&str| (*a).to_owned())
+            .collect::<Vec<_>>();
         let req_id = self.next_req_id.fetch_add(1, Ordering::SeqCst);
         let cmd = MPVCommand {
             command: cmd_args,
@@ -127,7 +129,10 @@ impl CommandAdapter {
         tx.clone().unwrap().send(s)
     }
 
-    pub fn send_recv<T: DeserializeOwned>(&self, args: Vec<&str>) -> Result<MPVResponse<T>, Box<Error>> {
+    pub fn send_recv<T: DeserializeOwned>(
+        &self,
+        args: Vec<&str>,
+    ) -> Result<MPVResponse<T>, Box<Error>> {
         let req_id = try!(self.send(args));
         let (tx, rx) = mpsc::channel::<String>();
 
@@ -145,7 +150,6 @@ impl CommandAdapter {
         Ok(serde_json::from_str(&line)?)
     }
 }
-
 
 pub fn new_command_adapter() -> CommandAdapter {
     let adapter = CommandAdapter {
