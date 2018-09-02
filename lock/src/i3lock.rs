@@ -19,6 +19,10 @@ impl I3Lock {
         if !self.active.compare_and_swap(false, true, Ordering::SeqCst) {
             let active = self.active.clone();
             thread::spawn(move || {
+                process::Command::new("killall")
+                    .arg("-SIGUSR1")
+                    .arg("dunst")
+                    .output().unwrap();
                 let now = SystemTime::now();
                 process::Command::new("i3lock")
                     .arg("-n")
@@ -26,6 +30,10 @@ impl I3Lock {
                     .output().unwrap();
                 active.store(false, Ordering::SeqCst);
                 println!("unlocked after {:?}", now.elapsed());
+                process::Command::new("killall")
+                    .arg("-SIGUSR2")
+                    .arg("dunst")
+                    .output().unwrap();
             });
             println!("locked.");
         }
