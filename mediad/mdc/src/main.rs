@@ -9,12 +9,13 @@ extern crate url;
 extern crate clap;
 
 use hyper::client::Client;
+use hyper::header::ContentType;
 use hyper::status::StatusCode;
-use url::Url;
 use std::io::prelude::*;
 use std::path::Path;
-use std::time::Duration;
 use std::thread::sleep;
+use std::time::Duration;
+use url::Url;
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct PlaylistEntry {
@@ -25,9 +26,7 @@ struct PlaylistEntry {
 
 fn send(url: Url) -> hyper::client::Response {
     let client = Client::new();
-    let result = client.post(url)
-        .send()
-        .unwrap();
+    let result = client.post(url).send().unwrap();
     match result.status {
         StatusCode::Ok => (),
         _ => println!("Error: {:?}", result.status),
@@ -35,37 +34,44 @@ fn send(url: Url) -> hyper::client::Response {
     result
 }
 
-fn mpv_cmd(url_base: &Url, args: Vec<&str>) -> String {
-    let mut url = url_base.clone();
-    url.set_path("command");
-    {
-        let mut query_pairs = url.query_pairs_mut();
-        for arg in args {
-            query_pairs.append_pair("arg", arg);
-        }
-    }
-    let mut response = send(url);
-    // println!("{:?}", response);
-    let mut s = String::new();
-    response.read_to_string(&mut s).unwrap();
-    s
+fn send_json<T: serde::Serialize, R: serde::de::DeserializeOwned>(endpoint: &str, data: T) -> R {
+    let client = Client::new();
+    let body = serde_json::to_string(&data).unwrap();
+
+    let url = Url::parse(&*format!("http://localhost:9922/{}", endpoint)).unwrap();
+    let result = client
+        .post(url)
+        .header(ContentType::json())
+        .body(&body)
+        .send()
+        .unwrap();
+    serde_json::from_reader(result).unwrap()
 }
 
-fn mpv_cmd_nr(url_base: &Url, args: Vec<&str>) -> Result<(), ()> {
-    let mut url = url_base.clone();
-    url.set_path("command");
-    {
-        let mut query_pairs = url.query_pairs_mut();
-        for arg in args {
-            query_pairs.append_pair("arg", arg);
-        }
-    }
-    url.query_pairs_mut().append_pair("no-wait", "true");
-    let mut response = send(url);
-    // println!("{:?}", response);
-    let mut s = String::new();
-    response.read_to_string(&mut s).unwrap();
-    Ok(())
+#[derive(Serialize)]
+struct CommandData {
+    no_wait: bool,
+    args: Vec<String>,
+}
+
+fn mpv_cmd<T: serde::de::DeserializeOwned>(args: Vec<&str>) -> T {
+    send_json(
+        "command",
+        CommandData {
+            no_wait: false,
+            args: args.iter().map(|&s| s.to_owned()).collect(),
+        },
+    )
+}
+
+fn mpv_cmd_nr(args: Vec<&str>) {
+    send_json::<CommandData, serde_json::Value>(
+        "command",
+        CommandData {
+            no_wait: true,
+            args: args.iter().map(|&s| s.to_owned()).collect(),
+        },
+    );
 }
 
 fn valid_file_path(path_str: &str) -> Option<String> {
@@ -103,34 +109,34 @@ fn main() {
 
     let mut url = Url::parse("http://localhost:9922").unwrap();
     match matches.subcommand() {
-        ("ping",  _) => {
+        ("ping", _) => {
             url.set_path("ping");
             let client = Client::new();
             std::process::exit(match client.get(url).send() {
-                Ok(result) => {
-                    match result.status {
-                        StatusCode::Ok => 0,
-                        _ => 1,
-                    }
+                Ok(result) => match result.status {
+                    StatusCode::Ok => 0,
+                    _ => 1,
                 },
                 Err(_) => 1,
             });
-        },
+        }
         ("pause", Some(options)) => {
             url.set_path("pause");
             let toggle = options.is_present("toggle");
-            url.query_pairs_mut().append_pair("toggle", &format!("{}", toggle));
+            url.query_pairs_mut()
+                .append_pair("toggle", &format!("{}", toggle));
             send(url);
-        },
+        }
         ("queue", Some(options)) => {
             url.set_path("enqueue");
             let replace = options.is_present("replace");
-            url.query_pairs_mut().append_pair("replace", &format!("{}", replace));
+            url.query_pairs_mut()
+                .append_pair("replace", &format!("{}", replace));
             let uri = options.value_of("INPUT").unwrap();
             let uri = valid_file_path(uri).unwrap_or_else(|| uri.into());
             url.query_pairs_mut().append_pair("uri", &uri);
             send(url);
-        },
+        }
         ("raw", Some(options)) => {
             url.set_path("command");
             {
@@ -147,11 +153,10 @@ fn main() {
             let mut s = String::new();
             println!("{:?}", response.read_to_string(&mut s));
             println!("{}", s);
-        },
+        }
         ("playlist", Some(options)) => {
-            let data = mpv_cmd(&url, vec!["get_property", "playlist"]);
+            let playlist: Vec<PlaylistEntry> = mpv_cmd(vec!["get_property", "playlist"]);
 
-            let playlist: Vec<PlaylistEntry> = serde_json::from_str(&data).unwrap();
             let mut found_current = false;
             for entry in playlist {
                 if let Some(true) = entry.playing {
@@ -167,13 +172,12 @@ fn main() {
             }
         }
         ("restart", _) => {
-            let playlist_data = mpv_cmd(&url, vec!["get_property", "playlist"]);
-            let playlist: Vec<PlaylistEntry> = serde_json::from_str(&playlist_data).unwrap();
-            let time: f64 = mpv_cmd(&url, vec!["get_property", "time-pos"]).parse().unwrap();
+            let playlist: Vec<PlaylistEntry> = mpv_cmd(vec!["get_property", "playlist"]);
+            let time: f64 = mpv_cmd(vec!["get_property", "time-pos"]);
             println!("playlist: {:#?}", playlist);
             println!("time current: {}", time);
             println!("quitting mpv...");
-            mpv_cmd_nr(&url, vec!["quit"]).unwrap();
+            mpv_cmd_nr(vec!["quit"]);
             sleep(Duration::from_secs(1));
             let mut found_current = false;
             for entry in &playlist {
@@ -182,7 +186,8 @@ fn main() {
 
                 if found_current {
                     println!("queueing {:?}", entry.filename);
-                    mpv_cmd(&url, vec!["loadfile", &*entry.filename, "append-play"]);
+                    let _: serde_json::Value =
+                        mpv_cmd(vec!["loadfile", &*entry.filename, "append-play"]);
                     sleep(Duration::from_secs(2));
                 }
 
@@ -190,11 +195,12 @@ fn main() {
                     println!("waiting for file load...");
                     sleep(Duration::from_secs(5)); // TODO wait for actual events
                     println!("seeking to {:?}", time);
-                    mpv_cmd(&url, vec!["seek", &*format!("{}", time), "absolute+keyframes"]);
+                    let _: serde_json::Value =
+                        mpv_cmd(vec!["seek", &*format!("{}", time), "absolute+keyframes"]);
                     sleep(Duration::from_secs(2));
                 }
             }
-        },
-        _ => { panic!("invalid subcommand") },
+        }
+        _ => panic!("invalid subcommand"),
     }
 }
