@@ -53,12 +53,13 @@ class TraceLog:
         loc = {bp.number: bp.location for bp in gdb.breakpoints()}
 
         if event_filter:
-            for i, (n, context) in enumerate(self.events):
-                if event_filter(n) or any(map(event_filter, context)):
+            for i, n in enumerate(self.events):
+                context = self.events[max(0, i-2):min(len(self.events), i+2)]
+                if any(map(event_filter, context)):
                     s.append(f"[{i}] {n} {loc[n]}")
         else:
             s = [f"[{i}] {n} {loc[n]}" for i, n in enumerate(self.events)]
-        gdb.write("\n".join(s))
+        gdb.write("\n".join(s) + "\n")
 
 
 
@@ -102,7 +103,9 @@ class TraceBreakpoints(gdb.Command):
         elif arg.startswith("refine "):
             self.refine(0, (0, 0))
         elif arg.startswith("log "):
-            ids = list(map(int, arg[len("log "):].split(" ")))
+            args = arg[len("log "):].split(" ")
+            loc = {bp.location: bp.number for bp in gdb.breakpoints()}
+            ids = [loc[i] if i in loc else int(i) for i in args]
             __trace__.print(event_filter=lambda e: e in ids)
         elif arg.startswith("log"):
             __trace__.print()
