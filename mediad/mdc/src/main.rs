@@ -11,7 +11,6 @@ extern crate clap;
 use hyper::client::Client;
 use hyper::header::ContentType;
 use hyper::status::StatusCode;
-use std::io::prelude::*;
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
@@ -138,21 +137,15 @@ fn main() {
             send(url);
         }
         ("raw", Some(options)) => {
-            url.set_path("command");
-            {
-                let mut query_pairs = url.query_pairs_mut();
-                for arg in options.values_of("INPUT").unwrap() {
-                    query_pairs.append_pair("arg", arg);
-                }
-                if options.is_present("no_response") {
-                    query_pairs.append_pair("no-wait", "1");
-                }
+            let args = options.values_of("INPUT").unwrap().collect::<Vec<_>>();
+
+            if options.is_present("no_response") {
+                mpv_cmd_nr(&args);
+            } else {
+                let res: serde_json::Value = mpv_cmd(&args);
+                let out = serde_json::to_string_pretty(&res).unwrap();
+                println!("{}", out);
             }
-            let mut response = send(url);
-            println!("{:#?}", response);
-            let mut s = String::new();
-            println!("{:?}", response.read_to_string(&mut s));
-            println!("{}", s);
         }
         ("playlist", Some(options)) => {
             let playlist: Vec<PlaylistEntry> = mpv_cmd(&["get_property", "playlist"]);
