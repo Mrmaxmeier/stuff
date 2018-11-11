@@ -1,27 +1,28 @@
-#[macro_use] extern crate enum_primitive;
+#[macro_use]
+extern crate enum_primitive;
 
 extern crate libc;
-extern crate x11;
 extern crate notify_rust;
 extern crate num;
 extern crate term;
 extern crate term_size;
+extern crate x11;
 #[macro_use]
 extern crate clap;
 
-use std::thread;
-use std::os::unix::net::{UnixStream, UnixListener};
-use std::io::prelude::*;
-use num::FromPrimitive;
-use std::sync::mpsc;
 use notify_rust::Notification;
+use num::FromPrimitive;
+use std::io::prelude::*;
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::sync::mpsc;
+use std::thread;
 
-mod xidle;
 mod i3lock;
-mod suspend;
 mod status;
+mod suspend;
+mod xidle;
 
-const SOCKFILE: &'static str = "/tmp/lock.sock";
+const SOCKFILE: &str = "/tmp/lock.sock";
 
 enum_from_primitive! {
     #[derive(Debug)]
@@ -36,14 +37,12 @@ fn daemon(progress: bool) {
     let (tx, rx) = mpsc::channel();
     {
         let tx = tx.clone();
-        thread::spawn(move || {
-            listen(tx).unwrap();
-        });
+        thread::spawn(move || listen(&tx).unwrap());
     }
 
     {
         let tx = tx.clone();
-        thread::spawn(move || xidle::XIdleService::new().notify(tx));
+        thread::spawn(move || xidle::XIdleService::new().notify(&tx));
     }
 
     if progress {
@@ -70,8 +69,8 @@ fn daemon(progress: bool) {
         match cmd {
             SockCommand::Quit => {
                 println!("bye-bye");
-                return
-            },
+                return;
+            }
             SockCommand::Lock => locker.ensure_locked(),
             SockCommand::Suspend => {
                 println!("suspending...");
@@ -81,16 +80,15 @@ fn daemon(progress: bool) {
     }
 }
 
-fn listen(tx: mpsc::Sender<SockCommand>) -> Result<(), std::io::Error> {
-
+fn listen(tx: &mpsc::Sender<SockCommand>) -> Result<(), std::io::Error> {
     if std::fs::remove_file(SOCKFILE).is_ok() {
         println!("removed old socket");
     }
 
-    let listener = try!(UnixListener::bind(SOCKFILE));
+    let listener = UnixListener::bind(SOCKFILE)?;
 
     for stream in listener.incoming() {
-        let stream = try!(stream);
+        let stream = stream?;
         let tx = tx.clone();
         thread::spawn(move || {
             for byte in stream.bytes() {
@@ -109,10 +107,9 @@ fn listen(tx: mpsc::Sender<SockCommand>) -> Result<(), std::io::Error> {
 }
 
 fn send(command: SockCommand) -> Result<(), std::io::Error> {
-    let mut stream = try!(UnixStream::connect(SOCKFILE));
+    let mut stream = UnixStream::connect(SOCKFILE)?;
     stream.write_all(&[command as u8])
 }
-
 
 fn main() {
     let matches = clap_app!(lock =>
@@ -124,27 +121,30 @@ fn main() {
         (@subcommand daemon =>
             (about: "Runs the lock daemon")
             (@arg progress: -p --progress "Displays a cli-hud containing the current state"))
-    ).get_matches();
+    )
+    .get_matches();
 
     match matches.subcommand() {
-        ("daemon",  Some(options)) => {
+        ("daemon", Some(options)) => {
             if send(SockCommand::Quit).is_ok() {
                 println!("stopped other daemon...");
             }
             daemon(options.is_present("progress"))
-        },
+        }
         ("lock", _) => {
             Notification::new()
                 .summary("locking remotely...")
-                .show().unwrap();
+                .show()
+                .unwrap();
             send(SockCommand::Lock).unwrap()
-        },
+        }
         ("suspend", _) => {
             Notification::new()
                 .summary("suspending remotely...")
-                .show().unwrap();
+                .show()
+                .unwrap();
             send(SockCommand::Suspend).unwrap()
-        },
-        _ => { unreachable!() },
+        }
+        _ => unreachable!(),
     }
 }

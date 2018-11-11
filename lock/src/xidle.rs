@@ -1,14 +1,14 @@
+use x11::xlib;
 use x11::xss;
 use x11::xss::XScreenSaverInfo;
-use x11::xlib;
 
-use std::time::Duration;
 use std::mem::zeroed;
 use std::ptr::null;
 use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 
-use SockCommand;
+use crate::SockCommand;
 
 pub struct XIdleService {
     display: *mut xlib::Display,
@@ -29,8 +29,8 @@ impl XIdleService {
         };
 
         XIdleService {
-            display: display,
-            root: root,
+            display,
+            root,
             lock_threshold: Duration::from_secs(60 * 3),
             sleep_threshold: Duration::from_secs(60 * 30),
         }
@@ -48,7 +48,7 @@ impl XIdleService {
         Duration::from_millis(self.query().idle)
     }
 
-    pub fn notify(&mut self, tx: mpsc::Sender<SockCommand>) {
+    pub fn notify(&mut self, tx: &mpsc::Sender<SockCommand>) {
         loop {
             let idle = self.idle();
             if idle >= self.lock_threshold {

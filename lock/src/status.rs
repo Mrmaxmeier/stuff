@@ -1,15 +1,14 @@
+use std::io;
+use std::io::prelude::*;
 use std::time::Duration;
 use term;
 use term_size;
-use std::io;
-use std::io::prelude::*;
 
-const SPINNER: [&'static str; 8] = ["⡆", "⠇", "⠋", "⠙", "⠸", "⢰", "⣠", "⣄"];
-
+const SPINNER: [&str; 8] = ["⡆", "⠇", "⠋", "⠙", "⠸", "⢰", "⣠", "⣄"];
 
 pub struct ProgressBar {
     sleep: Duration,
-    term: Box<term::Terminal<Output=io::Stdout>>,
+    term: Box<term::Terminal<Output = io::Stdout>>,
     tick: usize,
     term_size: usize,
     pub current: Duration,
@@ -27,7 +26,7 @@ impl ProgressBar {
             sleep: sleep_threshold,
             term: term::stdout().unwrap(),
             current: Duration::from_secs(0),
-            term_size: term_size,
+            term_size,
         }
     }
 
@@ -43,7 +42,8 @@ impl ProgressBar {
         let s = format!(
             "[{}] {} / {}",
             SPINNER[self.tick],
-            self.current.as_secs(), self.sleep.as_secs()
+            self.current.as_secs(),
+            self.sleep.as_secs()
         );
 
         write!(self.term, "\n{} [", s)?;
