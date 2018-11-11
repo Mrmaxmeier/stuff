@@ -1,5 +1,5 @@
 use std::process;
-use std::sync::atomic::{Ordering, AtomicBool};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::SystemTime;
@@ -11,7 +11,7 @@ pub struct I3Lock {
 impl I3Lock {
     pub fn new() -> I3Lock {
         I3Lock {
-            active: Arc::new(AtomicBool::new(false))
+            active: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -22,18 +22,22 @@ impl I3Lock {
                 process::Command::new("killall")
                     .arg("-SIGUSR1")
                     .arg("dunst")
-                    .output().unwrap();
+                    .output()
+                    .unwrap();
                 let now = SystemTime::now();
                 process::Command::new("i3lock")
                     .arg("-n")
-                    .arg("-c").arg("A6E22E")
-                    .output().unwrap();
+                    .arg("-c")
+                    .arg("A6E22E")
+                    .output()
+                    .unwrap();
                 active.store(false, Ordering::SeqCst);
                 println!("unlocked after {:?}", now.elapsed());
                 process::Command::new("killall")
                     .arg("-SIGUSR2")
                     .arg("dunst")
-                    .output().unwrap();
+                    .output()
+                    .unwrap();
             });
             println!("locked.");
         }

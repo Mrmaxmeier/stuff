@@ -1,9 +1,5 @@
-#[macro_use]
-extern crate enum_primitive;
-
 extern crate libc;
 extern crate notify_rust;
-extern crate num;
 extern crate term;
 extern crate term_size;
 extern crate x11;
@@ -11,7 +7,6 @@ extern crate x11;
 extern crate clap;
 
 use notify_rust::Notification;
-use num::FromPrimitive;
 use std::io::prelude::*;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::mpsc;
@@ -24,12 +19,22 @@ mod xidle;
 
 const SOCKFILE: &str = "/tmp/lock.sock";
 
-enum_from_primitive! {
-    #[derive(Debug)]
-    pub enum SockCommand {
-        Lock = 0,
-        Suspend = 1,
-        Quit = 2
+#[derive(Debug)]
+pub enum SockCommand {
+    Lock = 0,
+    Suspend = 1,
+    Quit = 2,
+}
+
+impl SockCommand {
+    fn from_u8(v: u8) -> Option<SockCommand> {
+        use SockCommand::*;
+        match v {
+            0 => Some(Lock),
+            1 => Some(Suspend),
+            2 => Some(Quit),
+            _ => None,
+        }
     }
 }
 
