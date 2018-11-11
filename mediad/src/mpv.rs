@@ -109,7 +109,7 @@ pub struct CommandAdapter {
 }
 
 impl CommandAdapter {
-    pub fn send(&self, cmd_args: Vec<&str>) -> Result<usize, Box<Error>> {
+    pub fn send(&self, cmd_args: &[&str]) -> Result<usize, Box<Error>> {
         let cmd_args = cmd_args
             .iter()
             .map(|a: &&str| (*a).to_owned())
@@ -119,8 +119,8 @@ impl CommandAdapter {
             command: cmd_args,
             request_id: req_id,
         };
-        let serialized = try!(serde_json::to_string(&cmd));
-        try!(self.tx_send(serialized));
+        let serialized = serde_json::to_string(&cmd)?;
+        self.tx_send(serialized)?;
         Ok(req_id)
     }
 
@@ -131,9 +131,9 @@ impl CommandAdapter {
 
     pub fn send_recv<T: DeserializeOwned>(
         &self,
-        args: Vec<&str>,
+        args: &[&str],
     ) -> Result<MPVResponse<T>, Box<Error>> {
-        let req_id = try!(self.send(args));
+        let req_id = self.send(args)?;
         let (tx, rx) = mpsc::channel::<String>();
 
         {
@@ -142,7 +142,7 @@ impl CommandAdapter {
         }
 
         println!("waiting for reqid {}", req_id);
-        let line = try!(rx.recv());
+        let line = rx.recv()?;
 
         let mut req_handlers = (*self.req_handlers).lock().unwrap();
         req_handlers.remove(&req_id);

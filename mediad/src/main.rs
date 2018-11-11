@@ -1,7 +1,9 @@
 #![feature(plugin)]
 #![feature(decl_macro)]
-#![plugin(rocket_codegen)]
 #![feature(custom_derive)]
+#![feature(proc_macro_hygiene)]
+
+#[macro_use]
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
@@ -9,7 +11,7 @@ extern crate rocket_contrib;
 use rocket::config::{Config, Environment};
 use rocket::response::status::BadRequest;
 use rocket::State;
-use rocket_contrib::{Json, JsonValue};
+use rocket_contrib::json::{Json, JsonValue};
 
 #[macro_use]
 extern crate serde_derive;
@@ -51,8 +53,8 @@ fn enqueue(
     };
 
     for uri in &params.uris {
-        let cmd = vec!["loadfile", &*uri, replace];
-        command_adapter.send(cmd).map_err(|_| ())?; // TODO
+        let cmd = ["loadfile", &*uri, replace];
+        command_adapter.send(&cmd).map_err(|_| ())?; // TODO
     }
     Ok(())
 }
@@ -68,16 +70,16 @@ fn command(
     params: Json<CommandData>,
     command_adapter: State<mpv::CommandAdapter>,
 ) -> Result<JsonValue, BadRequest<JsonValue>> {
-    let args = params.args.iter().map(|s| &**s).collect();
+    let args = params.args.iter().map(|s| &**s).collect::<Vec<_>>();
     let error = |v| BadRequest(Some(json!({ "error": v })));
     if params.no_wait {
         command_adapter
-            .send(args)
+            .send(&args)
             .map(|rid| json!({ "request_id": rid }))
             .map_err(|err| error(format!("{:?}", err)))
     } else {
         let resp = command_adapter
-            .send_recv::<Value>(args)
+            .send_recv::<Value>(&args)
             .map_err(|err| error(format!("{:?}", err)))?;
         println!("{:?}", resp);
 
@@ -97,10 +99,10 @@ fn main() {
     let cmd = mpv::new_command_adapter();
 
     {
-        let args = vec!["get_property", "fullscreen"];
+        let args = ["get_property", "fullscreen"];
         println!(
             "property fullscreen: {:?}",
-            cmd.send_recv::<bool>(args).unwrap().data.unwrap()
+            cmd.send_recv::<bool>(&args).unwrap().data.unwrap()
         );
     }
 
