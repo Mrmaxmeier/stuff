@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 regex-syntax = "0.6.3"
+rustc-ap-graphviz = "301.0.0"

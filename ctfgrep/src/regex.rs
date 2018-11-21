@@ -1,11 +1,11 @@
-use crate::statemachine::StateMachine;
+use crate::statemachine::{StateID, StateMachine};
 use regex_syntax::hir;
 use regex_syntax::hir::{Hir, HirKind, Visitor};
-use regex_syntax::{Parser, ParserBuilder};
+use regex_syntax::ParserBuilder;
 
 use std::collections::VecDeque;
 
-struct SMBuilder {
+pub struct SMBuilder {
   stack: VecDeque<VecDeque<StateMachine>>,
 }
 
@@ -15,21 +15,33 @@ impl Visitor for SMBuilder {
 
   fn start(&mut self) {
     println!("start");
+    self.stack.push_back(VecDeque::new());
   }
 
-  fn finish(self) -> Result<Self::Output, Self::Err> {
+  fn finish(mut self) -> Result<Self::Output, Self::Err> {
     println!("finish");
-    unimplemented!()
+    let sm = self.pop_single();
+    Ok(sm)
   }
 
   fn visit_pre(&mut self, _hir: &Hir) -> Result<(), Self::Err> {
     self.stack.push_back(VecDeque::new());
     match _hir.kind() {
-      HirKind::Literal(..) => self
+      HirKind::Literal(literal) => {
+        self
+          .stack
+          .back_mut()
+          .unwrap()
+          .push_back(StateMachine::from_seq(&[match literal {
+            hir::Literal::Byte(b) => *b,
+            hir::Literal::Unicode(c) => *c as u8,
+          }]))
+      }
+      HirKind::Class(class) => self
         .stack
-        .front_mut()
+        .back_mut()
         .unwrap()
-        .push_front(StateMachine::from_seq(b"X")),
+        .push_back(Self::from_class(class)),
       _ => {}
     };
     println!("visit_pre  {:?}", _hir);
@@ -40,19 +52,26 @@ impl Visitor for SMBuilder {
     match _hir.kind() {
       HirKind::Concat(..) => self.flatten_with(|a, b| a.concat(b)),
       HirKind::Alternation(..) => self.flatten_with(|a, b| a.union(b)),
-      HirKind::Repetition(..) => {
-        self.pop_single();
-        unimplemented!()
+      HirKind::Repetition(rep) => {
+        let mut sm = self.pop_single();
+        match &rep.kind {
+          hir::RepetitionKind::OneOrMore => sm.concat(sm.repeat()),
+          hir::RepetitionKind::ZeroOrMore => sm = sm.repeat(),
+          hir::RepetitionKind::ZeroOrOne => sm.union(StateMachine::empty()),
+          hir::RepetitionKind::Range(range) => unimplemented!(),
+        }
+        self.stack.back_mut().unwrap().push_back(sm);
       }
       _ => {
         // lower top of stack
         let mut top_of_stack = self.stack.pop_back().unwrap_or_default();
         while let Some(contents) = top_of_stack.pop_front() {
-          self.stack.front_mut().unwrap().push_back(contents);
+          self.stack.back_mut().unwrap().push_back(contents);
         }
       }
     }
     println!("visit_post {:?}", _hir);
+    println!("{:#?}", self.stack);
     Ok(())
   }
 
@@ -63,17 +82,14 @@ impl Visitor for SMBuilder {
 }
 
 impl SMBuilder {
-  fn construct_statemachine(regex: &str) {
+  pub fn construct_statemachine(regex: &str) -> Result<StateMachine, ()> {
     let mut parser = ParserBuilder::new().unicode(false).build();
     let res = parser.parse(regex).expect("invalid regex");
     println!("{:#?}", res);
-    hir::visit(
-      &res,
-      SMBuilder {
-        stack: VecDeque::new(),
-      },
-    )
-    .unwrap();
+    let builder = SMBuilder {
+      stack: VecDeque::new(),
+    };
+    hir::visit(&res, builder)
   }
 
   fn flatten_with<F: Fn(&mut StateMachine, StateMachine)>(&mut self, f: F) {
@@ -82,7 +98,7 @@ impl SMBuilder {
     while let Some(alt) = components.pop_front() {
       f(&mut sm, alt);
     }
-    self.stack.back_mut().unwrap().push_back(sm);
+    self.stack.back_mut().expect("stack empty").push_back(sm);
   }
 
   fn pop_single(&mut self) -> StateMachine {
@@ -90,9 +106,34 @@ impl SMBuilder {
     assert_eq!(tos.len(), 1);
     tos.pop_front().unwrap()
   }
+
+  fn from_class(class: &hir::Class) -> StateMachine {
+    match class {
+      hir::Class::Bytes(class) => {
+        let mut sm = StateMachine::empty();
+        sm.accepting.insert(StateID(1));
+        sm.description = String::new();
+        sm.description.push('[');
+        for byterange in class.iter() {
+          sm.description.push(byterange.start() as char);
+          if byterange.start() != byterange.end() {
+            sm.description.push('-');
+            sm.description.push(byterange.end() as char);
+          }
+          for c in byterange.start()..=byterange.end() {
+            sm.trans(StateID(0), StateID(1), Some(c), Some(c));
+          }
+        }
+        sm.description.push(']');
+        sm
+      }
+      _ => unimplemented!(),
+    }
+  }
 }
 
 pub fn meme() {
-  SMBuilder::construct_statemachine(r"(FLAG|RITSEC)\{\w{31}=\}");
-  SMBuilder::construct_statemachine(r"(FLAG|RITSEC)\{\w+\}");
+  let sm = SMBuilder::construct_statemachine(r"(FLAG|CTF)\{\w+\}").unwrap();
+  println!("{:?}", sm);
+  // SMBuilder::construct_statemachine(r"(FLAG|CTF)\{\w{31}=\}");
 }
