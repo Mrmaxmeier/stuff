@@ -15,7 +15,7 @@ pub struct Transition {
 
 #[derive(Clone)]
 pub struct StateMachine {
-    pub transitions: HashMap<StateID, HashMap<Option<u8>, Transition>>,
+    pub transitions: HashMap<StateID, HashMap<Option<u8>, HashSet<Transition>>>,
     pub accepting: HashSet<StateID>,
     pub state: StateID,
     pub description: String,
@@ -43,7 +43,9 @@ impl StateMachine {
         self.transitions
             .entry(source)
             .or_insert_with(HashMap::new)
-            .insert(input, Transition { target, match_char });
+            .entry(input)
+            .or_insert_with(HashSet::new)
+            .insert(Transition { target, match_char });
     }
 
     pub fn new_state(&mut self) -> StateID {
@@ -63,7 +65,7 @@ impl StateMachine {
         sm
     }
 
-    pub fn convert<F: Fn(StateID, &mut HashMap<Option<u8>, Transition>)>(&mut self, f: F) {
+    pub fn convert<F: Fn(StateID, &mut HashMap<Option<u8>, HashSet<Transition>>)>(&mut self, f: F) {
         for (s, trans) in self.transitions.iter_mut() {
             f(*s, trans)
         }
@@ -77,13 +79,16 @@ impl StateMachine {
                 offset(s),
                 trans
                     .iter()
-                    .map(|(&c, &transition)| {
+                    .map(|(&c, transitions)| {
                         (
                             c,
-                            Transition {
-                                target: offset(transition.target),
-                                ..transition
-                            },
+                            transitions
+                                .iter()
+                                .map(|&transition| Transition {
+                                    target: offset(transition.target),
+                                    ..transition
+                                })
+                                .collect(),
                         )
                     })
                     .collect(),
@@ -105,13 +110,16 @@ impl StateMachine {
                 offset(s),
                 trans
                     .iter()
-                    .map(|(&c, &transition)| {
+                    .map(|(&c, transitions)| {
                         (
                             c,
-                            Transition {
-                                target: offset(transition.target),
-                                ..transition
-                            },
+                            transitions
+                                .iter()
+                                .map(|&transition| Transition {
+                                    target: offset(transition.target),
+                                    ..transition
+                                })
+                                .collect(),
                         )
                     })
                     .collect(),
@@ -157,7 +165,7 @@ impl StateMachine {
                     trans
                         .iter()
                         .filter(|(&a, _)| a.is_none() || input == a)
-                        .map(|(&a, &b)| (b, a.is_some()))
+                        .flat_map(|(&a, b)| b.iter().map(move |&b| (b, a.is_some())))
                         .collect()
                 })
                 .unwrap_or_else(VecDeque::new),
@@ -169,7 +177,7 @@ impl StateMachine {
 
     pub fn dump_dot(&self) {
         use std::fs::File;
-        let mut f = File::create(format!("/tmp/statemachines/{}.dot", self.description)).unwrap();
+        let mut f = File::create(format!("/tmp/statemachines/{:?}.dot", self.description)).unwrap();
         dot::render(&self, &mut f).unwrap()
     }
 }
@@ -178,7 +186,7 @@ impl<'a> dot::Labeller<'a> for &StateMachine {
     type Node = StateID;
     type Edge = (StateID, StateID, Option<u8>);
     fn graph_id(&'a self) -> dot::Id<'a> {
-        dot::Id::new("example2").unwrap()
+        dot::Id::new("test").unwrap()
     }
     fn node_id(&'a self, n: &StateID) -> dot::Id<'a> {
         dot::Id::new(format!("N{}", n.0)).unwrap()
@@ -214,9 +222,9 @@ impl<'a> dot::GraphWalk<'a> for &StateMachine {
         self.transitions
             .iter()
             .flat_map(|(&source, trans)| {
-                trans
-                    .iter()
-                    .map(move |(&c, trans)| (source, trans.target, c))
+                trans.iter().flat_map(move |(&c, trans)| {
+                    trans.iter().map(move |trans| (source, trans.target, c))
+                })
             })
             .collect()
     }
@@ -259,13 +267,15 @@ impl<'a> Iterator for ClosureIter<'a> {
             if consumed_input {
                 return Some(state);
             }
-            for (&inp, &trans) in &self.state_machine.transitions[&state.target] {
-                if self.visited.contains(&trans.target) {
-                    continue;
-                }
-                if inp.is_none() || inp == self.input {
-                    self.stack.push_back((trans, inp.is_some()));
-                    self.visited.insert(trans.target);
+            for (&inp, trans) in &self.state_machine.transitions[&state.target] {
+                for &trans in trans {
+                    if self.visited.contains(&trans.target) {
+                        continue;
+                    }
+                    if inp.is_none() || inp == self.input {
+                        self.stack.push_back((trans, inp.is_some()));
+                        self.visited.insert(trans.target);
+                    }
                 }
             }
         }

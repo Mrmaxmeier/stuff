@@ -5,17 +5,24 @@ mod transforms;
 use self::statemachine::*;
 use self::transforms::*;
 
-const TEST_INPUT: &[u8; 103] = b"dank flag{ memes } 666c61677b20617979207d0a Q1RGe21lbWVzfQo= QUNURnt4fQo= QUFDVEZ7eX0K QUFBQ1RGe3p9Cg==";
+const TEST_INPUT: &[u8; 106] = b"ctf{dank} flag{memes} 666c61677b20617979207d0a Q1RGe21lbWVzfQo= QUNURnt4fQo= QUFDVEZ7eX0K QUFBQ1RGe3p9Cg==";
 
 fn main() {
-    regex::meme();
     // let mut sm = regex::SMBuilder::construct_statemachine(r"FLAG\{\w+\}").unwrap();
-    let mut sm = regex::SMBuilder::construct_statemachine(r"FLAG\{").unwrap();
+    let _tmp = regex::SMBuilder::construct_statemachine(r"\d*").unwrap();
+    println!("{:?}", _tmp);
+    _tmp.dump_dot();
+    let _tmp = hexlify(&_tmp);
+    println!("{:?}", _tmp);
+    _tmp.dump_dot();
+
     let mut _tmp = StateMachine::from_seq(b"X");
     _tmp.concat(StateMachine::from_seq(b"Y"));
     _tmp.dump_dot();
-    println!("abc {:#?}", _tmp);
-    // let mut sm = StateMachine::from_seq(b"FLAG{");
+    ignore_case(&mut _tmp);
+    _tmp.dump_dot();
+
+    let mut sm = regex::SMBuilder::construct_statemachine(r"(CTF|FLAG)\{\w+\}").unwrap();
     println!("meems {:#?}", sm);
     sm.dump_dot();
     ignore_case(&mut sm);

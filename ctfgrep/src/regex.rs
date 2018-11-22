@@ -83,7 +83,10 @@ impl Visitor for SMBuilder {
 
 impl SMBuilder {
   pub fn construct_statemachine(regex: &str) -> Result<StateMachine, ()> {
-    let mut parser = ParserBuilder::new().unicode(false).build();
+    let mut parser = ParserBuilder::new()
+      .allow_invalid_utf8(true)
+      .unicode(false)
+      .build();
     let res = parser.parse(regex).expect("invalid regex");
     println!("{:#?}", res);
     let builder = SMBuilder {
@@ -125,15 +128,10 @@ impl SMBuilder {
           }
         }
         sm.description.push(']');
+        sm.state.0 = 1;
         sm
       }
       _ => unimplemented!(),
     }
   }
-}
-
-pub fn meme() {
-  let sm = SMBuilder::construct_statemachine(r"(FLAG|CTF)\{\w+\}").unwrap();
-  println!("{:?}", sm);
-  // SMBuilder::construct_statemachine(r"(FLAG|CTF)\{\w{31}=\}");
 }
