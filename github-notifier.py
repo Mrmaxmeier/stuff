@@ -47,9 +47,6 @@ etag = None
 last_event = arrow.get(cfg["last_event"])
 auth = "token " + cfg["token"]
 
-blocking = ["i3lock"]
-required = ["i3"]
-
 def actorName(d):
     return d["actor"]["login"]
 
@@ -79,7 +76,7 @@ known_types = {
     "DeleteEvent": createDeleteEvent,
     "IssuesEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["issue"]["title"]), repoName(d)),
     "IssueCommentEvent": lambda d: "{} commented '{}'\non '{}'\n@{}".format(actorName(d), shortened(d["payload"]["comment"]["body"]), shortened(d["payload"]["issue"]["title"]), repoName(d)),
-    "CommitCommentEvent": lambda d: "{} commented '{}'\non '{}'\n@{}".format(actorName(d), shortened(d["payload"]["comment"]["body"]), shortened(d["payload"]["comment"]["b5ef6ec85b953b5c5a93c994e30f4bd9f66348cb"]), repoName(d)),
+    "CommitCommentEvent": lambda d: "{} commented '{}'\non '{}'\n@{}".format(actorName(d), shortened(d["payload"]["comment"]["body"]), shortened(d["payload"]["comment"]["path"]), repoName(d)),
     "PullRequestEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["pull_request"]["title"]), repoName(d)),
     "ForkEvent": lambda d: "{} forked {}".format(actorName(d), repoName(d)),
     "ReleaseEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["release"]["name"]), repoName(d)),
@@ -103,10 +100,8 @@ def notify(d):
     print(message + "\n")
     sh.notify_send(title, message, urgency="normal" if private else "low")
 
-tobenotified = []
-notified_start = False
-
 print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+sh.notify_send('github_notifier started', urgency="low")
 while True:
     headers = {"Accept": "application/vnd.github.v3+json", "Authorization": auth}
     if etag:
@@ -124,37 +119,10 @@ while True:
     for elem in r.json()[::-1]:
         if (last_event - arrow.get(elem["created_at"])).total_seconds() < 0:
             last_event = arrow.get(elem["created_at"])
-            tobenotified.append(elem)
+            notify(elem)
             cfg["last_event"] = str(last_event)
             with open(cfg_path, "w") as f:
                 json.dump(cfg, f)
-
-
-    blocked = False
-    for pname in blocking:
-        try:
-            sh.pgrep(pname)
-            blocked = True
-            if tobenotified:
-                print("{} notifications blocked by {}".format(len(tobenotified), pname))
-            break
-        except sh.ErrorReturnCode_1:
-            pass
-    for pname in required:
-        try:
-            sh.pgrep(pname)
-        except sh.ErrorReturnCode_1:
-            blocked = True
-            print(pname, "required")
-            break
-
-    if not blocked and tobenotified:
-        for elem in tobenotified:
-            notify(elem)
-        tobenotified = []
-    if not blocked and not notified_start:
-        sh.notify_send('github_notifier started', urgency="low")
-        notified_start = True
 
     etag = r.headers["etag"]
     try:

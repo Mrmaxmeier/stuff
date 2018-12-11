@@ -43,7 +43,6 @@ if not os.path.isfile(cfg_path):
 
 delay = 90
 blocking = ["i3lock"]
-required = ["i3"]
 
 with open(cfg_path, "r") as f:
 	data = json.load(f)
@@ -54,10 +53,10 @@ headers = {
 }
 
 tobenotified = []
-notified_start = False
 
 
 print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+sh.notify_send('twitch_notifier started', urgency="low")
 
 while True:
 	try:
@@ -108,13 +107,6 @@ while True:
 			break
 		except sh.ErrorReturnCode_1:
 			pass
-	for pname in required:
-		try:
-			sh.pgrep(pname)
-		except sh.ErrorReturnCode_1:
-			blocked = True
-			print(pname, "required")
-			break
 
 	if not blocked and tobenotified:
 		if len(tobenotified) > 2:
@@ -127,9 +119,6 @@ while True:
 			l = map(f, tobenotified)
 		sh.notify_send("Twitch", " ".join(l), urgency="low")
 		tobenotified = []
-	if not blocked and not notified_start:
-		sh.notify_send('twitch_notifier started', urgency="low")
-		notified_start = True
 
 	with open(cfg_path, "w") as f:
 		json.dump(data, f)
