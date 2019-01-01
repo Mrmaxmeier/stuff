@@ -28,7 +28,7 @@ pub enum SockCommand {
 
 impl SockCommand {
     fn from_u8(v: u8) -> Option<SockCommand> {
-        use SockCommand::*;
+        use self::SockCommand::*;
         match v {
             0 => Some(Lock),
             1 => Some(Suspend),

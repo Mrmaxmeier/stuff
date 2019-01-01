@@ -2,6 +2,7 @@
 authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
 name = "mdc"
 version = "0.1.0"
+edition = "2018"
 
 [dependencies]
 clap = "2.31.2"

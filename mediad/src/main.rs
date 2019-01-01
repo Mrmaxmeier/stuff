@@ -1,6 +1,5 @@
 #![feature(plugin)]
 #![feature(decl_macro)]
-#![feature(custom_derive)]
 #![feature(proc_macro_hygiene)]
 
 #[macro_use]
