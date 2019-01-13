@@ -3,14 +3,12 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-extern crate hyper;
+extern crate reqwest;
 extern crate url;
 #[macro_use]
 extern crate clap;
 
-use hyper::client::Client;
-use hyper::header::ContentType;
-use hyper::status::StatusCode;
+use reqwest::{Client, StatusCode};
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
@@ -23,25 +21,22 @@ struct PlaylistEntry {
     current: Option<bool>,
 }
 
-fn send(url: Url) -> hyper::client::Response {
+fn send(url: Url) -> reqwest::Response {
     let client = Client::new();
     let result = client.post(url).send().unwrap();
-    match result.status {
-        StatusCode::Ok => (),
-        _ => println!("Error: {:?}", result.status),
+    match result.status() {
+        StatusCode::OK => (),
+        _ => println!("Error: {:?}", result.status()),
     };
     result
 }
 
 fn send_json<T: serde::Serialize, R: serde::de::DeserializeOwned>(endpoint: &str, data: T) -> R {
     let client = Client::new();
-    let body = serde_json::to_string(&data).unwrap();
-
     let url = Url::parse(&*format!("http://localhost:9922/{}", endpoint)).unwrap();
     let result = client
         .post(url)
-        .header(ContentType::json())
-        .body(&body)
+        .json(&data)
         .send()
         .unwrap();
     serde_json::from_reader(result).unwrap()
@@ -112,8 +107,8 @@ fn main() {
             url.set_path("ping");
             let client = Client::new();
             std::process::exit(match client.get(url).send() {
-                Ok(result) => match result.status {
-                    StatusCode::Ok => 0,
+                Ok(result) => match result.status() {
+                    StatusCode::OK => 0,
                     _ => 1,
                 },
                 Err(_) => 1,
