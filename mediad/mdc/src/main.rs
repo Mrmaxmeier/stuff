@@ -34,11 +34,7 @@ fn send(url: Url) -> reqwest::Response {
 fn send_json<T: serde::Serialize, R: serde::de::DeserializeOwned>(endpoint: &str, data: T) -> R {
     let client = Client::new();
     let url = Url::parse(&*format!("http://localhost:9922/{}", endpoint)).unwrap();
-    let result = client
-        .post(url)
-        .json(&data)
-        .send()
-        .unwrap();
+    let result = client.post(url).json(&data).send().unwrap();
     serde_json::from_reader(result).unwrap()
 }
 
@@ -99,7 +95,8 @@ fn main() {
             (about: "Sends a raw command to mpv")
             (@arg no_response: -n --no-response "Returns immediately")
             (@arg INPUT: +required +multiple "Command args"))
-    ).get_matches();
+    )
+    .get_matches();
 
     let mut url = Url::parse("http://localhost:9922").unwrap();
     match matches.subcommand() {
@@ -122,14 +119,14 @@ fn main() {
             send(url);
         }
         ("queue", Some(options)) => {
-            url.set_path("enqueue");
-            let replace = options.is_present("replace");
-            url.query_pairs_mut()
-                .append_pair("replace", &format!("{}", replace));
             let uri = options.value_of("INPUT").unwrap();
             let uri = valid_file_path(uri).unwrap_or_else(|| uri.into());
-            url.query_pairs_mut().append_pair("uri", &uri);
-            send(url);
+            let mode = if options.is_present("replace") {
+                "replace"
+            } else {
+                "append-play"
+            };
+            mpv_cmd_nr(&["loadfile", &uri, mode]);
         }
         ("raw", Some(options)) => {
             let args = options.values_of("INPUT").unwrap().collect::<Vec<_>>();
