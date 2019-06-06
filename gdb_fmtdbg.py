@@ -201,19 +201,11 @@ for test in tests.splitlines():
 	assert all(parse_format_string(test)), test # no parse errors
 
 
-class FmtDbg(gdb.Command):
+class FmtDbg:
 	def __init__(self):
-		super(FmtDbg, self).__init__("fmtdbg-hook", gdb.COMMAND_USER)
-
-	def invoke(self, arg, from_tty):
-		targets = set(gdb.string_to_argv(arg) if arg else ["printf"])
-		covered = [x.location for x in gdb.breakpoints() if isinstance(x, PrintfBreakpoint)]
-		for target in targets:
-			if target in covered:
-				print(target, "already hooked")
-			else:
-				print("hooking", target)
-				PrintfBreakpoint(target)
+		self.update_arch()
+		self.update_callsite()
+		self.update_fmtstr()
 
 	def update_arch(self):
 		frame = gdb.selected_frame()
@@ -279,9 +271,6 @@ class FmtDbg(gdb.Command):
 			assert False, "unsupported architecture"
 
 	def context(self):
-		self.update_callsite()
-		self.update_arch()
-		self.update_fmtstr()
 		with clippy() as clp:
 			clp("It looks like you're trying to write a format string:")
 			clp(GREEN + repr(self.fmtstr) + RESET)
@@ -332,13 +321,24 @@ class FmtDbg(gdb.Command):
 					outcount = None
 
 
+class FmtDbgHook(gdb.Command):
+	def __init__(self):
+		super(FmtDbgHook, self).__init__("fmtdbg-hook", gdb.COMMAND_USER)
+
+	def invoke(self, arg, from_tty):
+		targets = set(gdb.string_to_argv(arg) if arg else ["printf"])
+		covered = [x.location for x in gdb.breakpoints() if isinstance(x, PrintfBreakpoint)]
+		for target in targets:
+			if target in covered:
+				print(target, "already hooked")
+			else:
+				print("hooking", target)
+				PrintfBreakpoint(target)
+
 class PrintfBreakpoint(gdb.Breakpoint):
 	def stop (self):
-		fmtdbg.context()
+		FmtDbg().context()
 		return True
-
-
-fmtdbg = FmtDbg()
 
 class FmtDbgStack(gdb.Command):
 	def __init__(self):
@@ -366,8 +366,7 @@ class FmtDbgStack(gdb.Command):
 			size = int(args[0])
 		typ = gdb.lookup_type("void").pointer()
 		#with clippy() as clp:
-		fmtdbg.update_callsite()
-		fmtdbg.update_arch()
+		fmtdbg = FmtDbg()
 		idx = 1 + size*self.repeat_count
 		for i in range(idx, idx+size):
 			arg_s, arg_v = fmtdbg.fmtstr_arg(i, typ, pad=3)
@@ -384,4 +383,6 @@ class FmtDbgStack(gdb.Command):
 				line += f">{RESET}"
 			print(line)
 			#clp(line)
+
+fmtdbghook = FmtDbgHook()
 fmtdbgstack = FmtDbgStack()
