@@ -196,30 +196,6 @@ tests = """
 %1$0#16hx
 %42c%11$n
 %11$n%256c%42c%11$hhn
-%49150u %4849$hn
-%% TODO 1$*269158540$x
-%% TODO 1$*13996$x
-
-  The format string will look like this:
-
-    '%4640d' +  # change the length
-    '%15$n'  +  # with 'direct parameter access' I write the lower part
-                # of frame 1's l0
-    '%3530d' +  # change the length again
-    '%15$hn' +  # overwrite the higher part
-    '%9876d' +  # change the length
-    '%18$hn' +  # And write like any format string exploit!
-
-
-    '%8x' * 13+ # pop 13 arguments (from argument 15)
-    '%6789d' +  # change length
-    '%n'     +  # write lower part
-    '%8x'    +  # pop
-    '%1122d' +  # modify length
-    '%hn'    +  # write higher part
-    '%2211d' +  # modify length
-    '%hn'       # And write, again, like any format string exploit.
-
 """.strip()
 for test in tests.splitlines():
 	assert all(parse_format_string(test)), test # no parse errors
@@ -265,18 +241,29 @@ class FmtDbg(gdb.Command):
 		}
 		# TODO: incomplete
 
+	def update_callsite(self):
+		func  = gdb.selected_frame().name()
+		family_parameter_offset = {
+			"printf": 0,
+			"fprintf": 1,
+			"dprintf": 1,
+			"sprintf": 1,
+			"snprintf": 2,
+		}
+		if func not in family_parameter_offset:
+			print("[!] unknown format string function. assuming printf function signature")
+		self.format_string_position = family_parameter_offset.get(func, 0)
+
 	def update_fmtstr(self):
 		frame = gdb.selected_frame()
 		arch = frame.architecture().name()
 		assert arch in ["i386", "i386:x86-64"]
 		char_ptr_type = gdb.lookup_type("char").pointer()
-		if arch == "i386":
-			charptr = gdb.parse_and_eval("$sp+4").cast(char_ptr_type.pointer()).dereference()
-		elif arch == "i386:x86-64":
-			charptr = gdb.parse_and_eval("$rdi").cast(char_ptr_type)
+		charptr = self.fmtstr_arg(0, char_ptr_type)[1]
 		self.fmtstr = charptr.string("latin1")
 
 	def fmtstr_arg(self, idx, typ, pad=0):
+		idx += self.format_string_position
 		if self.arch == "i386":
 			v = f"$sp+{(idx+1)*4}"
 			s = f"$sp[{idx+1:0{pad}}]"
@@ -292,6 +279,7 @@ class FmtDbg(gdb.Command):
 			assert False, "unsupported architecture"
 
 	def context(self):
+		self.update_callsite()
 		self.update_arch()
 		self.update_fmtstr()
 		with clippy() as clp:
@@ -378,6 +366,7 @@ class FmtDbgStack(gdb.Command):
 			size = int(args[0])
 		typ = gdb.lookup_type("void").pointer()
 		#with clippy() as clp:
+		fmtdbg.update_callsite()
 		fmtdbg.update_arch()
 		idx = 1 + size*self.repeat_count
 		for i in range(idx, idx+size):
