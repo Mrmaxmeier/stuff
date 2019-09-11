@@ -1,0 +1,42 @@
+_pkgname=tundra
+pkgname=${_pkgname}-git
+pkgver=v2.10.r2.g5ae273e
+pkgrel=1
+pkgdesc="Tundra is a code build system that tries to be accurate and fast for incremental builds"
+arch=('i686' 'x86_64')
+depends=('gtest')
+makedepends=()
+optdepends=()
+conflicts=()
+provides=(${_pkgname})
+source=('git://github.com/deplinenoise/tundra' 'gtest.patch')
+md5sums=('SKIP' 'SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
+}
+
+prepare() {
+  cd "$srcdir/$_pkgname"
+  patch --forward --strip=1 --input="${srcdir}/gtest.patch"
+}
+
+build() {
+  cd "$srcdir/$_pkgname"
+  make
+}
+
+check() {
+  cd "$srcdir/$_pkgname"
+  build/t2-unittest
+}
+
+package() {
+  cd $srcdir/$_pkgname
+  install -Dm755 build/t2-lua "$pkgdir/usr/bin/t2-lua"
+  install -Dm755 build/t2-inspect "$pkgdir/usr/bin/t2-inspect"
+  install -Dm755 build/tundra2 "$pkgdir/usr/bin/tundra2"
+  mkdir -p "$pkgdir/usr/share/tundra"
+  cp -r scripts/* "$pkgdir/usr/share/tundra/"
+}
