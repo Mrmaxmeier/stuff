@@ -1,0 +1,30 @@
+pkgname=libipt
+pkgver=2.0
+pkgrel=1
+pkgdesc="libipt (Intel Processor Tracing)"
+arch=('any')
+license=('MIT')
+makedepends=('cmake')
+optdepends=('cmake')
+source=("https://github.com/intel/libipt/archive/v${pkgver}.tar.gz")
+sha256sums=('fc1cabb4dbf5a6d7e93bccbaba7409cc408c389b208cf9c6c71a9a09416e58e1')
+
+prepare() {
+	cd "$srcdir/$pkgname-$pkgver"
+	mkdir -p build
+}
+
+build() {
+	cd "$srcdir/$pkgname-$pkgver/build"
+	cmake -D CMAKE_INSTALL_PREFIX=/usr -D CMAKE_INSTALL_LIBDIR=/usr/lib ..
+}
+
+package() {
+	cd "$srcdir/$pkgname-$pkgver/build"
+	make -j4 DESTDIR="$pkgdir/" install
+	cd ..
+	# rm -rf "$pkgdir/usr/include"
+	install -m 755 -d "$pkgdir/usr/share/licenses/$pkgname"
+	install -m 644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
+
