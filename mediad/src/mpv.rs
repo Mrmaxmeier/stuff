@@ -74,8 +74,7 @@ fn spawn_player_thread(adapter: CommandAdapter) {
             // FIXME: cleanup socket
             let path = &format!("/tmp/mpv-sock-{}-{}", pid, thread_rng().gen::<u16>());
             let mut cmd = Command::new("mpv");
-            cmd.arg("--input-ipc-server");
-            cmd.arg(path);
+            cmd.arg(&format!("--input-ipc-server={}", path));
             cmd.arg("--idle");
             let mut child = cmd.spawn().unwrap();
             println!("connecting to mpv ipc socket ({})", path);
@@ -109,7 +108,7 @@ pub struct CommandAdapter {
 }
 
 impl CommandAdapter {
-    pub fn send(&self, cmd_args: &[&str]) -> Result<usize, Box<Error>> {
+    pub fn send(&self, cmd_args: &[&str]) -> Result<usize, Box<dyn Error>> {
         let cmd_args = cmd_args
             .iter()
             .map(|a: &&str| (*a).to_owned())
@@ -132,7 +131,7 @@ impl CommandAdapter {
     pub fn send_recv<T: DeserializeOwned>(
         &self,
         args: &[&str],
-    ) -> Result<MPVResponse<T>, Box<Error>> {
+    ) -> Result<MPVResponse<T>, Box<dyn Error>> {
         let req_id = self.send(args)?;
         let (tx, rx) = mpsc::channel::<String>();
 
