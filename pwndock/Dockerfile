@@ -1,4 +1,6 @@
-FROM ubuntu:16.04
+FROM ubuntu:19.10
+
+ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update && \
 	apt-get install -y gdb vim tmux git python3 python3-pip socat wget htop ltrace strace patchelf && \
@@ -11,7 +13,6 @@ RUN apt-get install -y keystone && \
 RUN cd /tmp/ && \
 	git clone https://github.com/Gallopsled/pwntools && \
 	cd pwntools/ && \
-	git checkout dev3 && \
 	pip3 install --user --editable .
 
 RUN wget https://raw.githubusercontent.com/hellman/fixenv/master/r.sh -O /usr/bin/fixenv && \
@@ -30,9 +31,11 @@ RUN apt-get -y install openssh-server && \
 	chmod -R og-rwx /root/.ssh && \
 	service ssh start
 
+COPY ./ynetd /usr/bin/
+
 
 # apt-get -y install locales
 # locale-gen en_US.UTF-8
 
 ENV PYTHONIOENCODING=utf8
-env LC_CTYPE=C.UTF-8
+ENV LC_CTYPE=C.UTF-8
