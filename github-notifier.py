@@ -54,7 +54,7 @@ def repoName(d):
     return d["repo"]["name"]
 
 def createDeleteEvent(d):
-    s = "{} {} ".format(actorName(d), "created" if d["type"] == "CreateEvent" else "deleted")
+    s = "{} {} {} ".format(actorName(d), "created" if d["type"] == "CreateEvent" else "deleted", d["payload"]["ref_type"])
     if d["payload"]["ref_type"] == "repository":
         s += d["repo"]["name"]
     elif d["payload"]["ref_type"] in ["branch", "tag"]:
