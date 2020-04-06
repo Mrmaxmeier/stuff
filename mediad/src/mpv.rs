@@ -1,8 +1,5 @@
-use libc;
 use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
-use serde_json;
-use std;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::prelude::*;

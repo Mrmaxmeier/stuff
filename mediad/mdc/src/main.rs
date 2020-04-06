@@ -8,7 +8,8 @@ extern crate url;
 #[macro_use]
 extern crate clap;
 
-use reqwest::{Client, StatusCode};
+use reqwest::blocking::{Client, Response};
+use reqwest::StatusCode;
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
@@ -21,7 +22,7 @@ struct PlaylistEntry {
     current: Option<bool>,
 }
 
-fn send(url: Url) -> reqwest::Response {
+fn send(url: Url) -> Response {
     let client = Client::new();
     let result = client.post(url).send().unwrap();
     match result.status() {

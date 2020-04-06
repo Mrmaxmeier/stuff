@@ -46,10 +46,8 @@ fn enqueue(
         .as_ref()
         .map(|s| s == "true")
         .unwrap_or(false);
-    let replace = match replace {
-        true => "replace",
-        false => "append-play",
-    };
+
+    let replace = if replace { "replace" } else { "append-play" };
 
     for uri in &params.uris {
         let cmd = ["loadfile", &*uri, replace];
