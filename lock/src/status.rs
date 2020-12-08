@@ -8,7 +8,7 @@ const SPINNER: [&str; 8] = ["⡆", "⠇", "⠋", "⠙", "⠸", "⢰", "⣠", "�
 
 pub struct ProgressBar {
     sleep: Duration,
-    term: Box<term::Terminal<Output = io::Stdout>>,
+    term: Box<dyn term::Terminal<Output = io::Stdout>>,
     tick: usize,
     term_size: usize,
     pub current: Duration,
