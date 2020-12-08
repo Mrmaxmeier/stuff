@@ -1,5 +1,12 @@
 #!/usr/bin/python3
 
+# TODO: move braces from beginning of line to previous line
+# if (true) {        | if (true)              {
+#   do_smth();       |   do_smth()            ;}
+# } else {           | else                   {
+#   do_smth_else();  |   do_smth_else()       ;}
+# }                  |
+
 import click
 TAB_SIZE = 8
 MAGIC_NUMBER = 140
@@ -54,14 +61,15 @@ def restyle_lines(lines, move_lines=True):
     return "\n".join(l)
 
 @click.command()
-@click.argument('input', type=click.File('r'))
+@click.argument('input_file', type=click.File('r'))
 @click.option('--width', default=MAGIC_NUMBER)
 @click.option('--tabsize', default=TAB_SIZE)
-def main(input, width, tabsize):
+@click.option('--style', type=click.Choice(['snaek', 'haskal']))
+def main(input_file, width, tabsize):
     global TAB_SIZE, MAGIC_NUMBER
     TAB_SIZE = tabsize
     MAGIC_NUMBER = width
-    print(restyle_lines(input.readlines()))
+    print(restyle_lines(input_file.readlines()))
 
 if __name__ == '__main__':
     main()

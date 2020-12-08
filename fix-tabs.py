@@ -28,6 +28,9 @@ def process(indent_type, tab_size, lines):
         if line != line.rstrip('\t '):
             stats['trailing_whitespace'] += 1
         line = line.rstrip('\t ')
+        # only trailing whitespace:
+        # yield line
+        # continue
         fnw = first_non_whitespace(line, tab_size)
         if fnw is None:
             yield ''
