@@ -242,6 +242,8 @@ class FmtDbg:
 			"sprintf": 1,
 			"snprintf": 2,
 		}
+		for k in list(family_parameter_offset.keys()):
+			family_parameter_offset[f"__{k}_chk"] = family_parameter_offset[k]
 		if func not in family_parameter_offset:
 			print("[!] unknown format string function. assuming printf function signature")
 		self.format_string_position = family_parameter_offset.get(func, 0)
