@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 libc = "0.2.46"
-rand = "0.7.3"
+rand = "0.8"
 rocket = "0.4.0"
 rocket_contrib = "0.4.0"
 
