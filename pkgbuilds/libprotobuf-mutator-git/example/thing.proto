@@ -1,0 +1,9 @@
+
+syntax = "proto2";
+package thing;
+
+message Msg {
+  optional float optional_float = 1;
+  optional uint64 optional_uint64 = 2;
+  optional string optional_string = 3;
+}

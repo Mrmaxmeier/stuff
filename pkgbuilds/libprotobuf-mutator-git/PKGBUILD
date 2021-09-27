@@ -1,0 +1,31 @@
+
+pkgname=libprotobuf-mutator-git
+epoch=1
+pkgver=1
+pkgrel=1
+pkgdesc="libprotobuf-mutator-git"
+arch=('x86_64')
+url="https://github.com/google/libprotobuf-mutator"
+license=('APACHE')
+depends=('protobuf')
+makedepends=('cmake' 'ninja' 'clang')
+source=("libprotobuf-mutator::git+https://github.com/google/libprotobuf-mutator")
+sha256sums=('SKIP')
+
+build() {
+    cd libprotobuf-mutator
+
+    cmake . \
+        -GNinja \
+        -Bbuild \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr
+    ninja -C build
+}
+
+package() {
+    cd libprotobuf-mutator
+    DESTDIR="$pkgdir" ninja -C build install
+}
