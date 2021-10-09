@@ -2,7 +2,7 @@
 # Contributor: Ondrej Patrovic <ondrej@patrovic.com>
 
 pkgname=010editor
-pkgver=12.0
+pkgver=12.0.1
 
 pkgrel=1
 pkgdesc="Professional text and hex editing with Binary Templates technology"
@@ -18,7 +18,7 @@ source=(
 )
 sha256sums=(
   'e3398b117934840828a96cd33534fc9b9242ec96089c2f283add137975499766'
-  '7bb33047ea52e9a8a53a30864c8d71a90135b3e18dfa7db63db6d89ceecd8bf9'
+  'f0bb4a37f41c75184b30cb76c3810334993eebb6bc3764adc548c61a7cc7c852'
 )
 
 package() {
