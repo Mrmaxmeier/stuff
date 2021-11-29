@@ -16,7 +16,7 @@ impl I3Lock {
     }
 
     pub fn ensure_locked(&mut self) {
-        if !self.active.compare_and_swap(false, true, Ordering::SeqCst) {
+        if let Ok(_) = self.active.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst) {
             let active = self.active.clone();
             thread::spawn(move || {
                 process::Command::new("killall")
