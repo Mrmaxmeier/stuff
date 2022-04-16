@@ -1,15 +1,7 @@
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
-
-extern crate reqwest;
-extern crate url;
-#[macro_use]
-extern crate clap;
-
+use clap::Parser;
 use reqwest::blocking::{Client, Response};
 use reqwest::StatusCode;
+use serde_derive::{Deserialize, Serialize};
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
@@ -45,22 +37,22 @@ struct CommandData {
     args: Vec<String>,
 }
 
-fn mpv_cmd<T: serde::de::DeserializeOwned>(args: &[&str]) -> T {
+fn mpv_cmd<T: serde::de::DeserializeOwned, V: AsRef<str>>(args: &[V]) -> T {
     send_json(
         "command",
         CommandData {
             no_wait: false,
-            args: args.iter().map(|&s| s.to_owned()).collect(),
+            args: args.iter().map(|s| s.as_ref().to_owned()).collect(),
         },
     )
 }
 
-fn mpv_cmd_nr(args: &[&str]) {
+fn mpv_cmd_nr<T: AsRef<str>>(args: &[T]) {
     send_json::<CommandData, serde_json::Value>(
         "command",
         CommandData {
             no_wait: true,
-            args: args.iter().map(|&s| s.to_owned()).collect(),
+            args: args.iter().map(|s| s.as_ref().to_owned()).collect(),
         },
     );
 }
@@ -75,33 +67,44 @@ fn valid_file_path(path_str: &str) -> Option<String> {
     None
 }
 
-fn main() {
-    let matches = clap_app!(mdc =>
-        (version: "1.0")
-        (about: "A cli for mediad")
-        (settings: &[clap::AppSettings::SubcommandRequired])
-        (@subcommand ping => (about: "Checks connectivity"))
-        (@subcommand queue =>
-            (about: "Queues an entry into the playlist")
-            (@arg replace: -r --replace "Replaces current playing file with the new queued one")
-            (@arg INPUT: +required "The URI"))
-        (@subcommand pause =>
-            (about: "Pauses the current playback")
-            (@arg toggle: -t --toggle "Toggles playing state instead of setting it to paused"))
-        (@subcommand restart => (about: "Restarts mediad and restores the previous state"))
-        (@subcommand playlist =>
-            (about: "Displays the current playlist")
-            (@arg all: -a --all "Includes played entries"))
-        (@subcommand raw =>
-            (about: "Sends a raw command to mpv")
-            (@arg no_response: -n --no-response "Returns immediately")
-            (@arg INPUT: +required +multiple "Command args"))
-    )
-    .get_matches();
+#[derive(Parser)]
+enum Opts {
+    /// Checks connectivity
+    Ping,
+    /// Queues an entry into mpv's playlist
+    Queue {
+        /// Replaces currently playing file with INPUT
+        #[clap(short, long)]
+        replace: bool,
+        input: String,
+    },
+    /// Pauses playback
+    Pause {
+        #[clap(short, long)]
+        toggle: bool,
+    },
+    /// Restart mpv and restore previous state
+    Restart,
+    /// Display mpv's current playlist
+    Playlist {
+        /// Include past entries
+        #[clap(short, long)]
+        all: bool,
+    },
+    /// Send a raw RPC command to mpv
+    Raw {
+        /// Return without waiting for a response
+        #[clap(short, long)]
+        no_response: bool,
+        arguments: Vec<String>,
+    },
+}
 
+fn main() {
     let mut url = Url::parse("http://localhost:9922").unwrap();
-    match matches.subcommand() {
-        ("ping", _) => {
+    let opts = Opts::parse();
+    match opts {
+        Opts::Ping => {
             url.set_path("ping");
             let client = Client::new();
             std::process::exit(match client.get(url).send() {
@@ -112,35 +115,30 @@ fn main() {
                 Err(_) => 1,
             });
         }
-        ("pause", Some(options)) => {
+        Opts::Pause { toggle } => {
             url.set_path("pause");
-            let toggle = options.is_present("toggle");
             url.query_pairs_mut()
                 .append_pair("toggle", &format!("{}", toggle));
             send(url);
         }
-        ("queue", Some(options)) => {
-            let uri = options.value_of("INPUT").unwrap();
-            let uri = valid_file_path(uri).unwrap_or_else(|| uri.into());
-            let mode = if options.is_present("replace") {
-                "replace"
-            } else {
-                "append-play"
-            };
+        Opts::Queue { replace, input } => {
+            let uri = valid_file_path(&input).unwrap_or_else(|| input);
+            let mode = if replace { "replace" } else { "append-play" };
             mpv_cmd_nr(&["loadfile", &uri, mode]);
         }
-        ("raw", Some(options)) => {
-            let args = options.values_of("INPUT").unwrap().collect::<Vec<_>>();
-
-            if options.is_present("no_response") {
-                mpv_cmd_nr(&args);
+        Opts::Raw {
+            no_response,
+            arguments,
+        } => {
+            if no_response {
+                mpv_cmd_nr(&arguments);
             } else {
-                let res: serde_json::Value = mpv_cmd(&args);
+                let res: serde_json::Value = mpv_cmd(&arguments);
                 let out = serde_json::to_string_pretty(&res).unwrap();
                 println!("{}", out);
             }
         }
-        ("playlist", Some(options)) => {
+        Opts::Playlist { all } => {
             let playlist: Vec<PlaylistEntry> = mpv_cmd(&["get_property", "playlist"]);
 
             let mut found_current = false;
@@ -152,12 +150,12 @@ fn main() {
                     print!("> ");
                     found_current = true;
                 }
-                if found_current || options.is_present("all") {
+                if found_current || all {
                     println!("{}", entry.filename);
                 }
             }
         }
-        ("restart", _) => {
+        Opts::Restart => {
             let playlist: Vec<PlaylistEntry> = mpv_cmd(&["get_property", "playlist"]);
             let time: f64 = mpv_cmd(&["get_property", "time-pos"]);
             println!("playlist: {:#?}", playlist);
@@ -187,6 +185,5 @@ fn main() {
                 }
             }
         }
-        _ => panic!("invalid subcommand"),
     }
 }

@@ -2,12 +2,12 @@
 authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
 name = "mdc"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-clap = "2.32.0"
-serde = "1.0.84"
-serde_derive = "1.0.84"
-serde_json = "1.0.35"
+clap = { version = "3.1", features = ["derive"] }
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
 url = "2.0"
-reqwest = { version = "0.10.0", features = ["blocking", "json"] }
+reqwest = { version = "0.11", features = ["blocking", "json"] }
