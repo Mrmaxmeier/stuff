@@ -165,8 +165,10 @@ struct MPVCommand {
 
 #[derive(Deserialize, Debug)]
 pub struct GenericMPVResponse {
+    #[allow(unused)]
     error: Option<String>,
     request_id: Option<usize>,
+    #[allow(unused)]
     event: Option<String>,
 }
 
@@ -174,5 +176,6 @@ pub struct GenericMPVResponse {
 pub struct MPVResponse<T> {
     pub data: Option<T>,
     pub error: Option<String>,
+    #[allow(unused)]
     request_id: usize,
 }

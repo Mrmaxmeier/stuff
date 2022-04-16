@@ -2,15 +2,15 @@
 authors = ["Mrmaxmeier <Mrmaxmeier@gmail.com>"]
 name = "mediad"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-libc = "0.2.46"
-rand = "0.8"
-rocket = "0.4.0"
-rocket_contrib = "0.4.0"
+libc = "0.2.123"
+rand = "0.8.5"
+rocket = "0.4.10"
+rocket_contrib = "0.4.10"
 
-serde = "1.0.84"
-serde_derive = "1.0.84"
-serde_json = "1.0.35"
+serde = "1.0.136"
+serde_derive = "1.0.136"
+serde_json = "1.0.79"
 unix_socket = "0.5.0"

@@ -122,7 +122,7 @@ fn main() {
             send(url);
         }
         Opts::Queue { replace, input } => {
-            let uri = valid_file_path(&input).unwrap_or_else(|| input);
+            let uri = valid_file_path(&input).unwrap_or(input);
             let mode = if replace { "replace" } else { "append-play" };
             mpv_cmd_nr(&["loadfile", &uri, mode]);
         }
