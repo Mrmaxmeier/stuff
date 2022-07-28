@@ -1,0 +1,33 @@
+From 0c84174be0dbb1955ac2a613cd3c1829424656f0 Mon Sep 17 00:00:00 2001
+From: Mrmaxmeier <Mrmaxmeier@gmail.com>
+Date: Sat, 23 Jul 2022 21:33:49 +0200
+Subject: [PATCH 1/2] include c header and configure as shared library
+
+---
+ PKGBUILD | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/PKGBUILD b/PKGBUILD
+index a8aee36..0902b34 100644
+--- a/PKGBUILD
++++ b/PKGBUILD
+@@ -12,7 +12,7 @@ md5sums=('79a7070b4ae539d14accaea2687c98d3')
+ 
+ build() {
+   cd "$srcdir/$pkgname-rel-$pkgver"
+-  ./configure
++  ./configure -fPIC
+   make
+ }
+ 
+@@ -22,6 +22,7 @@ package() {
+ 
+   cd src
+   install -Dm644 cadical.hpp  "$pkgdir/usr/include/cadical.hpp"
++  install -Dm644 ccadical.h  "$pkgdir/usr/include/ccadical.h"
+   cd ..
+   cd build
+   install -Dm755 cadical      "$pkgdir/usr/bin/cadical"
+-- 
+2.37.1
+

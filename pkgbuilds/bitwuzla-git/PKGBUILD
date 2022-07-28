@@ -1,0 +1,45 @@
+# Adapted from boolector-git
+
+_pkgname=bitwuzla
+pkgname=bitwuzla-git
+pkgver=smtcomp.2021.r97.g190f734
+pkgrel=2
+pkgdesc="A Satisfiability Modulo Theories (SMT) solver for the theories of fixed-size bit-vectors, floating point arithmetic, arrays and uninterpreted functions"
+arch=('x86_64')
+url="https://github.com/bitwuzla/bitwuzla"
+license=('MIT')
+depends=('btor2tools-git' 'cadical')
+makedepends=('git' 'cmake' 'gtest')
+checkdepends=('python')
+provides=("$_pkgname=$pkgver")
+conflicts=("$_pkgname")
+source=("git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/$_pkgname"
+  git describe --long --tags | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+}
+
+build() {
+  cd "$srcdir/$_pkgname"
+  ./contrib/setup-symfpu.sh
+  cmake -B build \
+    -DCMAKE_INSTALL_PREFIX="/usr" \
+    -DBUILD_SHARED_LIBS=on \
+    -DTESTING=on
+  make -C build
+}
+
+check() {
+  cd "$srcdir/$_pkgname"
+  make -C build test
+}
+
+package() {
+  cd "$srcdir/$_pkgname"
+  make -C build DESTDIR="$pkgdir" install
+
+  install -Dm644 "COPYING" "$pkgdir/usr/share/licenses/$pkgname/COPYING"
+}
+# vim: set et ts=2:
