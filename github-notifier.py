@@ -83,6 +83,7 @@ known_types = {
     "GollumEvent": lambda d: "{}\n{}\n@{}".format(actorName(d), "\n".join(["{} '{}'".format(p['action'], p['title']) for p in d['payload']['pages']]), repoName(d)),
     "PullRequestReviewCommentEvent": lambda d: "{} reviewed '{}'".format(actorName(d), shortened(d["payload"]["pull_request"]["title"])),
     "MemberEvent": lambda d: "{} {} {}\n@{}".format(actorName(d), d["payload"]["action"], d["payload"]["member"]["login"], repoName(d)),
+    "PublicEvent": lambda d: "{} made {} public".format(actorName(d), repoName(d)),
 }
 
 def tostring(d):
