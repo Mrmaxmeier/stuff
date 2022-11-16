@@ -8,8 +8,8 @@ arch=('x86_64')
 url=http://hexler.net
 license=(custom:TouchOSC)
 makedepends=('radare2')
-source=("https://hexler.net/pub/touchosc/touchosc-$pkgver-linux-$arch.deb")
-sha256sums=('2d45a52c4b1352a5685809235c2ff33b388fa8ef391fc888970254edea8b45c6')
+source=("https://hexler.net/pub/touchosc/touchosc-$pkgver-linux-$arch.deb" "IsUnlocked.asm")
+sha256sums=('2d45a52c4b1352a5685809235c2ff33b388fa8ef391fc888970254edea8b45c6' 'SKIP')
 
 package() {
 
@@ -20,7 +20,7 @@ package() {
     sed -i 's:opt/touchosc:usr/bin:g' usr/share/applications/touchosc.desktop
 
     # hax
-    r2 -w -q -c "f sym.std_string_construct_empty @ sym.std::string::_S_empty_rep__+0x10; f sym.poco_dynamic_parse_string @ sym.Poco::Dynamic::Var::parse_std::string_const_; waf IsUnlocked.asm @ sym.LXUnlockStatus::IsUnlocked___const" "${srcdir}/opt/touchosc/TouchOSC"
+    r2 -w -q -c "f sym.std_string_construct_empty @ sym.std::string::_S_empty_rep__+0x10; f sym.poco_dynamic_parse_string @ sym.Poco::Dynamic::Var::parse_std::string_const_; waf ${srcdir}/IsUnlocked.asm @ sym.LXUnlockStatus::IsUnlocked___const" "${srcdir}/opt/touchosc/TouchOSC"
 
     install -Dm755 $srcdir/opt/touchosc/TouchOSC $pkgdir/usr/bin/TouchOSC
     install -Dm644 $srcdir/usr/share/applications/touchosc.desktop -t $pkgdir/usr/share/applications
