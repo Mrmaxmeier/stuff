@@ -1,0 +1,16 @@
+FROM fedora
+
+RUN dnf install -y gdb vim tmux git python3 python3-devel python3-pip python3-setuptools file socat nmap wget htop ltrace strace patchelf curl && \
+    dnf group install -y "C Development Tools and Libraries" "Development Tools" && \
+    dnf debuginfo-install -y glibc
+
+RUN wget -q -O- https://gef.blah.cat/sh | sh && \
+    echo "set auto-load safe-path /" >> /root/.gdbinit
+
+RUN git clone https://github.com/Gallopsled/pwntools /pwntools && \
+    cd /pwntools/ && \
+    git checkout dev && \
+    pip3 install --user --editable .
+
+ENV PYTHONIOENCODING=utf8
+ENV LC_CTYPE=C.UTF-8
