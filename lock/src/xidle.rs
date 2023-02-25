@@ -32,7 +32,7 @@ impl XIdleService {
             display,
             root,
             lock_threshold: Duration::from_secs(60 * 3),
-            sleep_threshold: Duration::from_secs(60 * 30),
+            sleep_threshold: Duration::from_secs(60 * 90),
         }
     }
 

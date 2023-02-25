@@ -1,8 +1,6 @@
 use std::io;
 use std::io::prelude::*;
 use std::time::Duration;
-use term;
-use term_size;
 
 const SPINNER: [&str; 8] = ["⡆", "⠇", "⠋", "⠙", "⠸", "⢰", "⣠", "⣄"];
 

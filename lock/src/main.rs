@@ -1,11 +1,4 @@
-extern crate libc;
-extern crate notify_rust;
-extern crate term;
-extern crate term_size;
-extern crate x11;
-#[macro_use]
-extern crate clap;
-
+use clap::Parser;
 use notify_rust::Notification;
 use std::io::prelude::*;
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -18,6 +11,9 @@ mod suspend;
 mod xidle;
 
 const SOCKFILE: &str = "/tmp/lock.sock";
+
+
+
 
 #[derive(Debug)]
 pub enum SockCommand {
@@ -40,15 +36,9 @@ impl SockCommand {
 
 fn daemon(progress: bool) {
     let (tx, rx) = mpsc::channel();
-    {
-        let tx = tx.clone();
-        thread::spawn(move || listen(&tx).unwrap());
-    }
-
-    {
-        let tx = tx.clone();
-        thread::spawn(move || xidle::XIdleService::new().notify(&tx));
-    }
+    let tx_ = tx.clone();
+    thread::spawn(move || listen(&tx_).unwrap());
+    thread::spawn(move || xidle::XIdleService::new().notify(&tx));
 
     if progress {
         thread::spawn(|| {
@@ -116,40 +106,46 @@ fn send(command: SockCommand) -> Result<(), std::io::Error> {
     stream.write_all(&[command as u8])
 }
 
-fn main() {
-    let matches = clap_app!(lock =>
-        (version: "1.0")
-        (about: "lock, a simple lock-state-manager")
-        (settings: &[clap::AppSettings::SubcommandRequired])
-        (@subcommand lock => (about: "Locks the current session"))
-        (@subcommand suspend => (about: "Suspends the current session"))
-        (@subcommand daemon =>
-            (about: "Runs the lock daemon")
-            (@arg progress: -p --progress "Displays a cli-hud containing the current state"))
-    )
-    .get_matches();
 
-    match matches.subcommand() {
-        ("daemon", Some(options)) => {
+/// lock, a simple lock-state-manager
+#[derive(Parser, Debug)] // requires `derive` feature
+enum Args {
+    /// Locks the current session
+    Lock,
+    /// Suspends the current session
+    Suspend,
+    /// Runs the lock daemon
+    Daemon {
+        /// Displays a CLI-HUD with an auto-suspend countdown
+        #[arg(long, short)]
+        progress: bool,
+    },
+}
+
+
+
+
+fn main() {
+    match Args::parse() {
+        Args::Daemon { progress } => {
             if send(SockCommand::Quit).is_ok() {
                 println!("stopped other daemon...");
             }
-            daemon(options.is_present("progress"))
+            daemon(progress)
         }
-        ("lock", _) => {
+        Args::Lock =>  {
             Notification::new()
                 .summary("locking remotely...")
                 .show()
                 .unwrap();
             send(SockCommand::Lock).unwrap()
         }
-        ("suspend", _) => {
+        Args::Suspend => {
             Notification::new()
                 .summary("suspending remotely...")
                 .show()
                 .unwrap();
             send(SockCommand::Suspend).unwrap()
         }
-        _ => unreachable!(),
     }
 }
