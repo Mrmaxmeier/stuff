@@ -24,7 +24,7 @@ impl Suspender {
             return;
         }
         Command::new("systemctl")
-            .arg("suspend")
+            .arg("suspned-then-hibernate")
             .output()
             .expect("failed to suspend");
 
