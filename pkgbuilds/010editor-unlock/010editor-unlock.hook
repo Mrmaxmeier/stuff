@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/bin/010editor
+
+[Action]
+Description = [010editor-unlock] Patching ...
+Exec = /usr/share/010editor-unlock/patch.sh
+When = PostTransaction

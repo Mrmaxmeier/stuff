@@ -1,0 +1,18 @@
+# compatible with ~1.1.9.163
+pkgname=touchosc-bin-unlock
+pkgver=1.1.9.163
+pkgrel=1
+pkgdesc='touchosc-bin unlock hook'
+arch=('x86_64')
+depends=('radare2' 'touchosc-bin')
+install="${pkgname}.install"
+source=("$pkgname.hook" "patch.sh" "IsUnlocked.asm")
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+
+package() {
+    cd "$srcdir"
+
+    install -Dm 644 "${srcdir}/${pkgname}.hook" "${pkgdir}/usr/share/libalpm/hooks/${pkgname}.hook"
+    install -Dm 755 "${srcdir}/patch.sh" "${pkgdir}/usr/share/${pkgname}/patch.sh"
+    install -Dm 644 "${srcdir}/IsUnlocked.asm" "${pkgdir}/usr/share/${pkgname}/IsUnlocked.asm"
+}

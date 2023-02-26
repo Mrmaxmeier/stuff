@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/bin/TouchOSC
+
+[Action]
+Description = [touchosc-bin-unlock] Patching ...
+Exec = /usr/share/touchosc-bin-unlock/patch.sh
+When = PostTransaction

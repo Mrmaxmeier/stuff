@@ -1,0 +1,17 @@
+# compatible with ~13.0.1
+pkgname=010editor-unlock
+pkgver=13.0
+pkgrel=1
+pkgdesc='010editor unlock hook'
+arch=('x86_64')
+depends=('radare2' '010editor')
+install="${pkgname}.install"
+source=("$pkgname.hook" "patch.sh")
+sha256sums=('SKIP' 'SKIP')
+
+package() {
+    cd "$srcdir"
+
+    install -Dm 644 "${srcdir}/${pkgname}.hook" "${pkgdir}/usr/share/libalpm/hooks/${pkgname}.hook"
+    install -Dm 755 "${srcdir}/patch.sh" "${pkgdir}/usr/share/${pkgname}/patch.sh"
+}

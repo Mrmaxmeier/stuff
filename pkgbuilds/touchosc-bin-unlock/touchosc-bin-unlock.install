@@ -1,0 +1,7 @@
+post_install() {
+  /usr/share/touchosc-bin-unlock/patch.sh
+}
+
+post_upgrade() {
+  /usr/share/touchosc-bin-unlock/patch.sh
+}

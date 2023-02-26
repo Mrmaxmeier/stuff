@@ -1,0 +1,7 @@
+post_install() {
+  /usr/share/010editor-unlock/patch.sh
+}
+
+post_upgrade() {
+  /usr/share/010editor-unlock/patch.sh
+}
