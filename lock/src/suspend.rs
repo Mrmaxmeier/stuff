@@ -23,15 +23,38 @@ impl Suspender {
             );
             return;
         }
-        Command::new("systemctl")
-            .arg("suspned-then-hibernate")
-            .output()
-            .expect("failed to suspend");
+
+        self.trigger_suspend();
+
 
         // https://github.com/systemd/systemd/blob/36376e0b71d97e276429e0e6307f116587ac83bd/TODO#L440-L443
         thread::sleep(Duration::from_secs(2));
 
         println!("elapsed while suspended: {:?}", now.elapsed());
         self.last_resume = SystemTime::now();
+    }
+
+    fn trigger_suspend(&self) {
+        if self.allow_hibernation() {
+            let res = Command::new("systemctl")
+                .arg("suspend-then-hibernate")
+                .output()
+                .expect("failed to spawn systemctl suspend-then-hibernate");
+
+            // suspend-then-hibernate might fail in low-swap situations
+            if res.status.success() {
+                return;
+            }
+        }
+
+        Command::new("systemctl")
+                .arg("suspend")
+                .output()
+                .expect("failed to spawn systemctl suspend");
+    }
+
+    fn allow_hibernation(&self) -> bool {
+        let hostname = std::fs::read_to_string("/etc/hostname").unwrap_or("unknown".into());
+        hostname.trim() !=  "tuna"
     }
 }
