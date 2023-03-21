@@ -4,7 +4,6 @@ import sys
 import os
 import time
 import json
-import getpass
 
 import requests
 import arrow
@@ -15,22 +14,46 @@ if len(sys.argv) > 1:
 else:
     cfg_path = os.path.expanduser("~") + "/.config/github-notifier.json"
 
+CLIENT_ID = "2cdcb6911fa2bd088826"
+
 if not os.path.isfile(cfg_path):
-    print(cfg_path, "missing")
-    username = input("Username: ")
-    pw = getpass.getpass()
-    print("requesting access token for scopes:")
-    scopes = ["notifications", "repo", "user", "read:discussion", "gist"]
-    print(scopes)
+    print(cfg_path, "missing, generating token via oauth device flow...")
 
-    auth = requests.auth.HTTPBasicAuth(username, pw)
+    res = requests.post("https://github.com/login/device/code", headers={
+        'Accept': 'application/json'
+    }, data={
+        'client_id': CLIENT_ID,
+        'scope': 'notifications read:user',
+    })
+    data = res.json()
+    # print(json.dumps(data, indent=4))
+    print(f"User Verification Code: {data['user_code']}")
 
-    headers = {"Accept": "application/vnd.github.v3+json"}
-    data = dict(scopes=scopes, note="github-notifier.py auth")
-    pprint(data)
-    r = requests.post("https://api.github.com/authorizations", headers=headers, auth=auth, json=data).json()
-    pprint(r)
-    token = r["token"]
+    print("Go to this url https://github.com/login/device and enter the code.")
+    sh.Command("xdg-open")("https://github.com/login/device")
+    print("Press any key to continue")
+    input()
+
+
+    res = requests.post('https://github.com/login/oauth/access_token', headers={
+        'Accept': 'application/json'
+    }, data={
+        'client_id': CLIENT_ID,
+        'device_code': data['device_code'],
+        'grant_type': 'urn:ietf:params:oauth:grant-type:device_code'
+    })
+    # print(json.dumps(res.json(), indent=4))
+
+    token = res.json()['access_token']
+
+    # print("\n\nUser Info:\n")
+    res = requests.get(
+        "https://api.github.com/user", headers={'Authorization': 'token ' + res.json()['access_token']})
+
+    # print(json.dumps(res.json(), indent=4) + '\n\n\n')
+    username = res.json()["login"]
+
+    print(f"Check your authorization at https://github.com/settings/connections/applications/{CLIENT_ID}")
 
     with open(cfg_path, "w") as f:
         json.dump({
