@@ -1,0 +1,4 @@
+[project]
+name = "numba"
+version = "1"
+description = "non-optimizing stub for numba"

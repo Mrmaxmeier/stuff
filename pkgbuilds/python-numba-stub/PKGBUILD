@@ -1,0 +1,24 @@
+# numba is broken at the moment and has non-trivial dependencies
+# => if perf is not relevant. replace with no-op package instead.
+pkgname=python-numba-stub
+pkgver=1
+pkgrel=1
+pkgdesc="non-optimizing stub for numba"
+arch=(any)
+provides=("python-numba")
+conflicts=("python-numba")
+source=("__init__.py" "pyproject.toml")
+sha256sums=("SKIP" "SKIP")
+
+makedepends=(python-build python-installer python-wheel)
+
+build() {
+    mkdir -p numba
+    cp __init__.py numba/
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    python -m installer --destdir="$pkgdir" dist/*.whl
+}
+
