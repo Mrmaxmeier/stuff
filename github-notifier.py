@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 from pprint import pprint
 import sys
 import os
@@ -122,7 +122,26 @@ def notify(d):
         pprint(d)
     print(title + " - Private" if private else title)
     print(message + "\n")
-    sh.notify_send(title, message, urgency="normal" if private else "low")
+    while True:
+        try:
+            sh.notify_send(title, message, urgency="normal" if private else "low")
+            break
+        except sh.ErrorReturnCode_1 as e:
+            # NOTE: below is the implementation that I'd expect to work.
+            # turns out we can ignore this entirely. Might break in the future though.
+            if b"GDBus.Error:org.freedesktop.Notifications.Error.ExcessNotificationGeneration" in e.stderr:
+                print(e.stderr.decode().strip())
+                break
+
+
+            # Plasma doesn't like many similar notifications, but we still want them to appear.
+            # Throttle to reasonable rates:
+            if b"GDBus.Error:org.freedesktop.Notifications.Error.ExcessNotificationGeneration" in e.stderr:
+                print(e.stderr.decode().strip())
+                time.sleep(15)
+                continue
+            else:
+                raise e
 
 print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 sh.notify_send('github_notifier started', urgency="low")
