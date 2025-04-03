@@ -18,5 +18,9 @@ pwn22.04:
 	docker build -t pwn22.04 -f Dockerfile-22.04 .
 
 .PHONY:
+pwn24.04:
+	docker build -t pwn24.04 -f Dockerfile-24.04 .
+
+.PHONY:
 pwnfedora:
 	docker build -t pwnfedora -f Dockerfile-fedora .
