@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# dependencies = ["requests", "arrow", "sh"]
+# ///
+
 from pprint import pprint
 import sys
 import os
@@ -23,7 +27,7 @@ if not os.path.isfile(cfg_path):
         'Accept': 'application/json'
     }, data={
         'client_id': CLIENT_ID,
-        'scope': 'notifications read:user',
+        'scope': 'notifications read:user read:discussion repo gist',
     })
     data = res.json()
     # print(json.dumps(data, indent=4))

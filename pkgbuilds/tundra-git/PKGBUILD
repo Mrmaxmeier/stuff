@@ -1,6 +1,6 @@
 _pkgname=tundra
 pkgname=${_pkgname}-git
-pkgver=v2.10.r2.g5ae273e
+pkgver=v2.13.r0.g2cddb3d
 pkgrel=1
 pkgdesc="Tundra is a code build system that tries to be accurate and fast for incremental builds"
 arch=('i686' 'x86_64')

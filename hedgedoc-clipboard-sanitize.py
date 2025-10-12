@@ -1,6 +1,10 @@
-#!/usr/bin/env python3
-# Strip hidden anchor tags from HedgeDoc rich text copies, which could
-# be used to link i.e. an email body back to the HedgeDoc instance
+#!/usr/bin/env -S uv run --script
+# /// script
+# dependencies = ["beautifulsoup4", "PyGObject"]
+# ///
+
+"""Strip hidden anchor tags from HedgeDoc rich text copies, which could
+be used to link i.e. an email body back to the HedgeDoc instance"""
 
 import subprocess
 from bs4 import BeautifulSoup

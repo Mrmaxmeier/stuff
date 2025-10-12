@@ -2,8 +2,8 @@
 
 _pkgname=bitwuzla
 pkgname=bitwuzla-git
-pkgver=smtcomp.2021.r97.g190f734
-pkgrel=2
+pkgver=smtcomp.2021.r210.g3ea759d
+pkgrel=1
 pkgdesc="A Satisfiability Modulo Theories (SMT) solver for the theories of fixed-size bit-vectors, floating point arithmetic, arrays and uninterpreted functions"
 arch=('x86_64')
 url="https://github.com/bitwuzla/bitwuzla"

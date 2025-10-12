@@ -18,7 +18,6 @@ function openLink (info, tab) {
   xhr.send(JSON.stringify({
     uris: [info.linkUrl]
   }))
-  xhr.send()
 }
 
 chrome.contextMenus.create({

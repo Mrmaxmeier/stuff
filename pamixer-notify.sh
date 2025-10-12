@@ -1,7 +1,8 @@
 #!/bin/bash
 
 notify() {
-    notify-send -t 1000 --hint=int:transient:1 "$1" "Current is $(pamixer --get-volume-human)" --icon=multimedia-volume-control
+    # notify-send -t 1000 --hint=int:transient:1 "$1" "Current is $(pamixer --get-volume-human)" --icon=multimedia-volume-control
+    notify-send -t 1000 --hint=int:value:$(pamixer --get-volume-human) --hint=int:transient:1 "$1" --icon=multimedia-volume-control
 }
 
 case "$1" in

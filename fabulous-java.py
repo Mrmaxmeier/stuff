@@ -64,7 +64,7 @@ def restyle_lines(lines, move_lines=True):
 @click.argument('input_file', type=click.File('r'))
 @click.option('--width', default=MAGIC_NUMBER)
 @click.option('--tabsize', default=TAB_SIZE)
-@click.option('--style', type=click.Choice(['snaek', 'haskal']))
+# @click.option('--style', type=click.Choice(['snaek', 'haskal']))
 def main(input_file, width, tabsize):
     global TAB_SIZE, MAGIC_NUMBER
     TAB_SIZE = tabsize
