@@ -24,3 +24,7 @@ pwn24.04:
 .PHONY:
 pwnfedora:
 	docker build -t pwnfedora -f Dockerfile-fedora .
+
+.PHONY:
+pwnalpine:
+	docker build -t pwnalpine -f Dockerfile-alpine .

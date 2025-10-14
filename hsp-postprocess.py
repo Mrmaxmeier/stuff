@@ -38,8 +38,8 @@ def parse_snapshot(timestamp: str, snapshot: dict) -> Snapshot:
         name = el["Kursname"]
         name = name.replace('<span style="color:#FFB000"><b> – NEU –</B>', "")
         name = name.replace('<span style="color:#c82254"><b>– fit4more –</B>', "")
-        name = name.replace("<br>", ":", 1)
-        name = name.replace("<br>", "")
+        name = name.replace('<span style="color:#FFB000">', "")
+        name = name.replace("<br>", ":", 1).replace("<br>", "").replace("</br>", "")
         name = name.strip()
         name = name.rstrip(":")
         if any(x.lower() in name.lower() for x in skip_courses):

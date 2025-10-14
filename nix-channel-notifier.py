@@ -53,7 +53,7 @@ while True:
             print(text)
             notify(text)
         current_rev = rev
-    except requests.exceptions.ConnectionError as e:
+    except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
         print(e)
         time.sleep(60)
     time.sleep(120)

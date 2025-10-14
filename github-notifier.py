@@ -74,11 +74,24 @@ etag = None
 last_event = arrow.get(cfg["last_event"])
 auth = "token " + cfg["token"]
 
+def shortened(msg, length=55):
+    msg = msg.strip("\n")
+    if len(msg.split("\n")) < 2 and len(msg) <= length:
+        return msg
+    return msg.split("\n")[0][:length] + " [...]"
+
 def actorName(d):
     return d["actor"]["login"]
 
 def repoName(d):
     return d["repo"]["name"]
+
+def pr_title(d):
+    pr = d["payload"]["pull_request"]
+    if "title" in pr:
+        return f"'{shortened(pr['title'])}'"
+    assert "number" in pr
+    return f"{d['repo']['name']}#{pr['number']}"
 
 def createDeleteEvent(d):
     s = "{} {} {} ".format(actorName(d), "created" if d["type"] == "CreateEvent" else "deleted", d["payload"]["ref_type"])
@@ -90,32 +103,37 @@ def createDeleteEvent(d):
         s += d["payload"]["ref_type"]
     return s
 
-def shortened(msg, length=55):
-    msg = msg.strip("\n")
-    if len(msg.split("\n")) < 2 and len(msg) <= length:
-        return msg
-    return msg.split("\n")[0][:length] + " [...]"
+def push_event(d):
+    if "commits" not in d["payload"]:
+        # Note: We could probably fetch the commits here.
+        return f"{actorName(d)} pushed to {d['repo']['name']}"
+    return "\n".join([c["author"]["name"] + ": " + shortened(c["message"]) for c in d["payload"]["commits"]]) + "\n@" + d["repo"]["name"]
 
 known_types = {
-    "PushEvent": lambda d: "\n".join([c["author"]["name"] + ": " + shortened(c["message"]) for c in d["payload"]["commits"]]) + "\n@" + d["repo"]["name"],
-    "WatchEvent": lambda d: "{} starred {}".format(actorName(d), d["repo"]["name"]),
+    "PushEvent": push_event,
+    "WatchEvent": lambda d: f"{actorName(d)} starred {d['repo']['name']}",
     "CreateEvent": createDeleteEvent,
     "DeleteEvent": createDeleteEvent,
     "IssuesEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["issue"]["title"]), repoName(d)),
     "IssueCommentEvent": lambda d: "{} commented '{}'\non '{}'\n@{}".format(actorName(d), shortened(d["payload"]["comment"]["body"]), shortened(d["payload"]["issue"]["title"]), repoName(d)),
     "CommitCommentEvent": lambda d: "{} commented '{}'\non '{}'\n@{}".format(actorName(d), shortened(d["payload"]["comment"]["body"]), shortened(d["payload"]["comment"]["path"]), repoName(d)),
-    "PullRequestEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["pull_request"]["title"]), repoName(d)),
-    "ForkEvent": lambda d: "{} forked {}".format(actorName(d), repoName(d)),
+    "PullRequestEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], pr_title(d), repoName(d)),
+    "ForkEvent": lambda d: f"{actorName(d)} forked {repoName(d)}",
     "ReleaseEvent": lambda d: "{} {} '{}'\n@{}".format(actorName(d), d["payload"]["action"], shortened(d["payload"]["release"]["name"]), repoName(d)),
     "GollumEvent": lambda d: "{}\n{}\n@{}".format(actorName(d), "\n".join(["{} '{}'".format(p['action'], p['title']) for p in d['payload']['pages']]), repoName(d)),
-    "PullRequestReviewCommentEvent": lambda d: "{} reviewed '{}'".format(actorName(d), shortened(d["payload"]["pull_request"]["title"])),
-    "MemberEvent": lambda d: "{} {} {}\n@{}".format(actorName(d), d["payload"]["action"], d["payload"]["member"]["login"], repoName(d)),
-    "PublicEvent": lambda d: "{} made {} public".format(actorName(d), repoName(d)),
+    "PullRequestReviewCommentEvent": lambda d: f"{actorName(d)} reviewed {pr_title(d)}",
+    "MemberEvent": lambda d: f"{actorName(d)} {d['payload']['action']} {d['payload']['member']['login']}\n@{repoName(d)}",
+    "PublicEvent": lambda d: f"{actorName(d)} made {repoName(d)} public",
 }
 
 def tostring(d):
     if d["type"] in known_types:
-        return known_types[d["type"]](d), True
+        f = known_types[d["type"]]
+        try:
+            return f(d), True
+        except Exception as e:
+            pprint(d)
+            raise e
     return "'{}'".format(d["type"]), False
 
 def notify(d):
@@ -150,7 +168,12 @@ def notify(d):
 print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 sh.notify_send('github_notifier started', urgency="low")
 while True:
-    headers = {"Accept": "application/vnd.github.v3+json", "Authorization": auth}
+    headers = {
+        "Accept": "application/vnd.github.v3+json",
+        "Authorization": auth,
+        "User-Agent": "github-notifier.py (from: Mrmaxmeier/stuff)",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
     if etag:
         headers["If-None-Match"] = etag
     try:

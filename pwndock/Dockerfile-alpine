@@ -1,0 +1,14 @@
+FROM alpine:latest
+
+RUN apk update && \
+	apk add gdb vim tmux git python3 && \
+	apk add file socat wget htop ltrace strace patchelf curl && \
+	apk add binutils
+
+#apk add gdb vim tmux git python3 python3-pip python3-setuptools file socat wget htop ltrace strace patchelf curl build-base openssl-dev libffi-dev
+
+RUN wget -q -O- https://gef.blah.cat/sh | sh
+RUN echo "set auto-load safe-path /" >> /root/.gdbinit
+
+ENV PYTHONIOENCODING=utf8
+ENV LC_CTYPE=C.UTF-8
