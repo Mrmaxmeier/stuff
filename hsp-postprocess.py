@@ -27,7 +27,7 @@ class Snapshot:
 
 def parse_snapshot(timestamp: str, snapshot: dict) -> Snapshot:
     courses = []
-    skip_courses = ["key competencies", "Uni-Fit – Einführungskurs", "Uni-Fit – Introductory Course", "Kunstrasenplatz"]
+    skip_courses = ["key competencies", "Uni-Fit – Einführungskurs", "Uni-Fit – Introductory Course", "Kunstrasenplatz", "Beachvolleyballanlage"]
     for el in snapshot:
         # pprint(el)
         if el["Start"].startswith("9999-"): continue
@@ -38,8 +38,11 @@ def parse_snapshot(timestamp: str, snapshot: dict) -> Snapshot:
         name = el["Kursname"]
         name = name.replace('<span style="color:#FFB000"><b> – NEU –</B>', "")
         name = name.replace('<span style="color:#c82254"><b>– fit4more –</B>', "")
+        name = name.replace('<span style="color:#4EB490"><b>– UNIBOOST –</B>', "")
         name = name.replace('<span style="color:#FFB000">', "")
-        name = name.replace("<br>", ":", 1).replace("<br>", "").replace("</br>", "")
+        name = name.replace('<b> – EVENT –</B>', "")
+        name = name.replace("<br>", ":", 1)
+        name = name.replace("<br>", "").replace("</br>", "").replace("<\\br", "").replace("</B>", "")
         name = name.strip()
         name = name.rstrip(":")
         if any(x.lower() in name.lower() for x in skip_courses):
@@ -111,6 +114,8 @@ def generate_report(snapshots: List[Snapshot]) -> Report:
                 print(f"{b.timestamp} Removed: {course_id} {name}")
             elif ca is None:
                 print(f"{b.timestamp} Added: {course_id} {name}")
+            if free_spots_old == free_spots_new:
+                continue
             changelog.append(Change(timestamp=b.timestamp, course_id=course_id, course_name=name, free_spots_old=free_spots_old, free_spots_new=free_spots_new))
 
     course_reports = [
