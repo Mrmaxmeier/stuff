@@ -4,6 +4,7 @@
 # ///
 
 from pprint import pprint
+from pathlib import Path
 import sys
 import os
 import time
@@ -14,9 +15,12 @@ import arrow
 import sh
 
 if len(sys.argv) > 1:
-    cfg_path = sys.argv[1]
+    cfg_path = Path(sys.argv[1])
 else:
-    cfg_path = os.path.expanduser("~") + "/.config/github-notifier.json"
+    cfg_path = Path(os.path.expanduser("~")) / ".config" / "github-notifier.json"
+
+cache_path = Path(os.path.expanduser("~")) / ".cache" / "github-notifier"
+cache_path.mkdir(parents=True, exist_ok=True)
 
 CLIENT_ID = "2cdcb6911fa2bd088826"
 
@@ -30,7 +34,6 @@ if not os.path.isfile(cfg_path):
         'scope': 'notifications read:user read:discussion repo gist',
     })
     data = res.json()
-    # print(json.dumps(data, indent=4))
     print(f"User Verification Code: {data['user_code']}")
 
     print("Go to this url https://github.com/login/device and enter the code.")
@@ -46,15 +49,11 @@ if not os.path.isfile(cfg_path):
         'device_code': data['device_code'],
         'grant_type': 'urn:ietf:params:oauth:grant-type:device_code'
     })
-    # print(json.dumps(res.json(), indent=4))
 
     token = res.json()['access_token']
 
-    # print("\n\nUser Info:\n")
-    res = requests.get(
-        "https://api.github.com/user", headers={'Authorization': 'token ' + res.json()['access_token']})
+    res = requests.get("https://api.github.com/user", headers={'Authorization': 'token ' + res.json()['access_token']})
 
-    # print(json.dumps(res.json(), indent=4) + '\n\n\n')
     username = res.json()["login"]
 
     print(f"Check your authorization at https://github.com/settings/connections/applications/{CLIENT_ID}")
@@ -127,6 +126,11 @@ known_types = {
 }
 
 def tostring(d):
+    # Keep a copy of each event type to get an real-world example.
+    cache_file = cache_path / f"{d['type']}.json"
+    with open(cache_file, "w") as f:
+        json.dump(d, f)
+
     if d["type"] in known_types:
         f = known_types[d["type"]]
         try:
@@ -155,7 +159,6 @@ def notify(d):
                 print(e.stderr.decode().strip())
                 break
 
-
             # Plasma doesn't like many similar notifications, but we still want them to appear.
             # Throttle to reasonable rates:
             if b"GDBus.Error:org.freedesktop.Notifications.Error.ExcessNotificationGeneration" in e.stderr:
@@ -164,6 +167,7 @@ def notify(d):
                 continue
             else:
                 raise e
+
 
 print("Started ({})".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 sh.notify_send('github_notifier started', urgency="low")

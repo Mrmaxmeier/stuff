@@ -39,6 +39,7 @@ def parse_snapshot(timestamp: str, snapshot: dict) -> Snapshot:
         name = name.replace('<span style="color:#FFB000"><b> – NEU –</B>', "")
         name = name.replace('<span style="color:#c82254"><b>– fit4more –</B>', "")
         name = name.replace('<span style="color:#4EB490"><b>– UNIBOOST –</B>', "")
+        name = name.replace('<span style="color:#c82254"><b>', "")
         name = name.replace('<span style="color:#FFB000">', "")
         name = name.replace('<b> – EVENT –</B>', "")
         name = name.replace("<br>", ":", 1)
@@ -56,7 +57,7 @@ def parse_snapshot(timestamp: str, snapshot: dict) -> Snapshot:
             registration_open=el["Status"] == "<div class='free'>Buchbar</div>"
         ))
     return Snapshot(timestamp=timestamp, courses=courses)
-    
+
 
 def get_snapshots(jsonl_file):
     cur = []
